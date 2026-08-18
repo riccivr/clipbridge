@@ -1,3 +1,5 @@
 clipbridge
 *.o
 *.tar.gz
+*.dmg
+build/

@@ -56,11 +56,14 @@ clean:
 	rm -f clipbridge $(OBJ) plugin.o platform_macos.o platform_posix.o platform_win32.o clipbridge-$(VERSION).tar.gz
 
 dist: clean
-	mkdir -p clipbridge-$(VERSION)
-	cp -R LICENSE Makefile README.md config.mk clipbridge.1 arg.h clipbridge.h clipbridge.c platform_posix.c platform_win32.c platform_macos.m clipbridge-$(VERSION)
+	mkdir -p clipbridge-$(VERSION)/scripts
+	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.1 arg.h clipbridge.h clipbridge.c platform_posix.c platform_win32.c platform_macos.m scripts clipbridge-$(VERSION)
 	tar -cf clipbridge-$(VERSION).tar clipbridge-$(VERSION)
 	gzip clipbridge-$(VERSION).tar
 	rm -rf clipbridge-$(VERSION)
+
+dmg: all
+	sh scripts/build_dmg.sh
 
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
@@ -80,4 +83,4 @@ test: all
 	./clipbridge -h 2>&1 | grep -q "usage:"
 	@echo "[PASS] clipbridge CLI options verified"
 
-.PHONY: all clean dist install uninstall test
+.PHONY: all clean dist dmg install uninstall test

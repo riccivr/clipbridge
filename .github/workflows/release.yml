@@ -1,0 +1,70 @@
+name: Release Matrix (DMG, Linux, Windows)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos-dmg:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout unipaste dependency
+        uses: actions/checkout@v4
+        with:
+          repository: riccivr/unipaste
+          path: unipaste
+
+      - name: Build ClipBridge macOS binary & DMG
+        run: |
+          mkdir -p ../unipaste
+          cp -R unipaste/* ../unipaste/
+          make dmg
+
+      - name: Upload macOS DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clipbridge-macos-dmg
+          path: ClipBridge-*.dmg
+
+      - name: Publish DMG to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ClipBridge-*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout unipaste dependency
+        uses: actions/checkout@v4
+        with:
+          repository: riccivr/unipaste
+          path: unipaste
+
+      - name: Build Linux binary
+        run: |
+          mkdir -p ../unipaste
+          cp -R unipaste/* ../unipaste/
+          make
+          tar -czvf clipbridge-linux-x86_64.tar.gz clipbridge clipbridge.1 README.md LICENSE
+
+      - name: Upload Linux Tarball
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: clipbridge-linux-x86_64.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
