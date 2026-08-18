@@ -1,5 +1,6 @@
 /* See LICENSE file for copyright and license details. */
 #ifdef __APPLE__
+#define _DARWIN_C_SOURCE 1
 
 #import <Cocoa/Cocoa.h>
 #include <stdio.h>

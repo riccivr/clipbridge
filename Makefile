@@ -17,7 +17,7 @@ UNIPASTE_OBJ = parser.o table.o entity.o strbuf.o plugin.o
 ifeq ($(UNAME_S),Darwin)
 PLATFORM_SRC = platform_macos.m
 PLATFORM_OBJ = platform_macos.o
-LDFLAGS += -framework AppKit -framework Foundation
+LDFLAGS = -Wl,-dead_strip -framework AppKit -framework Foundation
 else
 PLATFORM_SRC = platform_posix.c platform_win32.c
 PLATFORM_OBJ = platform_posix.o platform_win32.o
