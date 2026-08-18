@@ -6,16 +6,36 @@
 #include <stdlib.h>
 #include <string.h>
 #include "clipbridge.h"
+#include "unipaste.h"
 
 static UINT cf_html = 0;
+static UINT cf_ignore = 0;
+static UINT cf_no_history = 0;
+static UINT cf_no_cloud = 0;
 static DWORD last_seq = 0;
+static const struct config *active_cfg = NULL;
 
 static void
 init_win32_clipboard(void)
 {
 	if (!cf_html) {
 		cf_html = RegisterClipboardFormatA("HTML Format");
+		cf_ignore = RegisterClipboardFormatA("Clipboard Viewer Ignore");
+		cf_no_history = RegisterClipboardFormatA("CanIncludeInClipboardHistory");
+		cf_no_cloud = RegisterClipboardFormatA("CanUploadToCloudStore");
 	}
+}
+
+/* Check if clipboard content contains sensitive privacy flags (e.g. from password managers) */
+static int
+is_clipboard_ignored(void)
+{
+	init_win32_clipboard();
+
+	if (cf_ignore && IsClipboardFormatAvailable(cf_ignore))
+		return 1;
+
+	return 0;
 }
 
 int
@@ -28,6 +48,9 @@ clipboard_read_html(char **out_html, size_t *out_len)
 	init_win32_clipboard();
 	*out_html = NULL;
 	*out_len = 0;
+
+	if (is_clipboard_ignored())
+		return -1;
 
 	if (!IsClipboardFormatAvailable(cf_html))
 		return -1;
@@ -110,7 +133,7 @@ process_html_to_clipboard(const char *html, size_t len, const struct config *cfg
 	int ret;
 
 	strbuf_init(&sb, len * 2);
-	ret = unipaste_process_string(html, len, NULL, cfg);
+	ret = unipaste_process_to_strbuf(html, len, &sb, cfg);
 	if (ret == 0 && sb.len > 0) {
 		clipboard_write_text(sb.data, sb.len);
 	}
@@ -161,9 +184,14 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			size_t len = 0;
 			if (clipboard_read_html(&html, &len) == 0 && html && len > 0) {
 				struct config cfg;
-				memset(&cfg, 0, sizeof(cfg));
-				cfg.mode = MODE_PLAIN;
-				cfg.crlf = 1; /* Windows Notepad loves CRLF */
+				if (active_cfg) {
+					cfg = *active_cfg;
+				} else {
+					memset(&cfg, 0, sizeof(cfg));
+					cfg.mode = MODE_PLAIN;
+				}
+				/* Ensure Windows CRLF on Win32 by default */
+				cfg.crlf = 1;
 				process_html_to_clipboard(html, len, &cfg);
 				last_seq = GetClipboardSequenceNumber();
 				free(html);
@@ -181,7 +209,7 @@ clipboard_watch(const struct config *cfg)
 	HWND hwnd;
 	MSG msg;
 
-	(void)cfg;
+	active_cfg = cfg;
 	init_win32_clipboard();
 
 	memset(&wc, 0, sizeof(wc));
