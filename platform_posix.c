@@ -5,8 +5,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/wait.h>
+#include <signal.h>
 #include "clipbridge.h"
+#include "unipaste.h"
+
+static volatile sig_atomic_t running = 1;
+
+static void
+sig_handler(int sig)
+{
+	(void)sig;
+	running = 0;
+}
 
 /* Determine the available clipboard read command for HTML */
 static const char *
@@ -96,32 +106,24 @@ clipboard_sync_once(const struct config *cfg)
 {
 	char *html = NULL;
 	size_t html_len = 0;
-	char *tmp_buf = NULL;
-	size_t tmp_len = 0;
-	FILE *mem_fp;
+	struct strbuf out_sb;
 	int ret;
 
 	if (clipboard_read_html(&html, &html_len) != 0 || !html || html_len == 0) {
 		return 1; /* No rich HTML currently on clipboard */
 	}
 
-	mem_fp = open_memstream(&tmp_buf, &tmp_len);
-	if (!mem_fp) {
-		free(html);
-		return -1;
-	}
-
-	ret = unipaste_process_string(html, html_len, mem_fp, cfg);
-	fclose(mem_fp);
+	strbuf_init(&out_sb, html_len * 2);
+	ret = unipaste_process_to_strbuf(html, html_len, &out_sb, cfg);
 	free(html);
 
-	if (ret == 0 && tmp_buf && tmp_len > 0) {
-		clipboard_write_text(tmp_buf, tmp_len);
-		free(tmp_buf);
+	if (ret == 0 && out_sb.len > 0) {
+		clipboard_write_text(out_sb.data, out_sb.len);
+		strbuf_free(&out_sb);
 		return 0;
 	}
 
-	free(tmp_buf);
+	strbuf_free(&out_sb);
 	return ret;
 }
 
@@ -149,30 +151,30 @@ clipboard_watch(const struct config *cfg)
 	size_t last_len = 0;
 	char *curr_html = NULL;
 	size_t curr_len = 0;
+	struct sigaction sa;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = sig_handler;
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
 
 	printf("clipbridge: monitoring clipboard (press Ctrl+C to stop)...\n");
 	fflush(stdout);
 
-	while (1) {
+	while (running) {
 		if (clipboard_read_html(&curr_html, &curr_len) == 0 && curr_html && curr_len > 0) {
 			if (last_html == NULL || last_len != curr_len || memcmp(last_html, curr_html, curr_len) != 0) {
-				char *tmp_buf = NULL;
-				size_t tmp_len = 0;
-				FILE *mem_fp = open_memstream(&tmp_buf, &tmp_len);
+				struct strbuf out_sb;
+				strbuf_init(&out_sb, curr_len * 2);
 
-				if (mem_fp) {
-					if (unipaste_process_string(curr_html, curr_len, mem_fp, cfg) == 0) {
-						fclose(mem_fp);
-						if (tmp_buf && tmp_len > 0) {
-							clipboard_write_text(tmp_buf, tmp_len);
-							printf("clipbridge: [synced] formatted %zu bytes of rich text -> plain text\n", curr_len);
-							fflush(stdout);
-						}
-					} else {
-						fclose(mem_fp);
+				if (unipaste_process_to_strbuf(curr_html, curr_len, &out_sb, cfg) == 0) {
+					if (out_sb.len > 0) {
+						clipboard_write_text(out_sb.data, out_sb.len);
+						printf("clipbridge: [synced] formatted %zu bytes of rich text -> plain text\n", curr_len);
+						fflush(stdout);
 					}
-					free(tmp_buf);
 				}
+				strbuf_free(&out_sb);
 
 				free(last_html);
 				last_html = curr_html;
@@ -188,6 +190,7 @@ clipboard_watch(const struct config *cfg)
 	}
 
 	free(last_html);
+	printf("\nclipbridge: stopped cleanly.\n");
 	return 0;
 }
 
