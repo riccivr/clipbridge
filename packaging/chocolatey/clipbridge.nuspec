@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>clipbridge</id>
+    <version>1.1.0</version>
+    <title>clipbridge</title>
+    <authors>riccivr</authors>
+    <projectUrl>https://github.com/riccivr/clipbridge</projectUrl>
+    <licenseUrl>https://github.com/riccivr/clipbridge/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <tags>clipboard daemon win32 unipaste formatting markdown</tags>
+    <summary>Universal clipboard bridge and background daemon powered by unipaste</summary>
+    <description>Lightweight, cross-platform clipboard synchronization daemon that intercepts rich clipboard updates and automatically upgrades plain text fallback with unipaste formatting.</description>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

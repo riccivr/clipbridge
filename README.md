@@ -161,11 +161,43 @@ Compile `clipbridge.exe` and create a shortcut in `shell:startup`.
 
 ---
 
-### Option B: Pre-built Binary Packages (Releases)
+### Option B: Package Managers
+
+#### Homebrew (macOS & Linux)
+```sh
+brew tap riccivr/tap
+brew install clipbridge
+
+# To run as background daemon:
+brew services start clipbridge
+```
+
+#### Arch Linux (AUR)
+```sh
+yay -S clipbridge
+# or with paru:
+paru -S clipbridge
+```
+
+#### Debian / Ubuntu (.deb)
+Download the `.deb` package from [Releases](https://github.com/riccivr/clipbridge/releases) or build locally:
+```sh
+sudo dpkg -i clipbridge_1.1.0_amd64.deb
+```
+
+#### Windows (Chocolatey)
+```powershell
+choco install clipbridge
+```
+
+---
+
+### Option C: Pre-built Binary Packages (Releases)
 Pre-compiled standalone binaries and installer images are available on the [GitHub Releases](https://github.com/riccivr/clipbridge/releases) page:
 * **macOS**: `ClipBridge-1.1.0.dmg` (Drag-and-drop `ClipBridge.app` + one-click background daemon activator).
 * **Linux (x86_64)**: `clipbridge-v1.1.0-linux-x86_64.tar.gz` (Pre-compiled standalone binary).
 * **Windows (x64)**: `clipbridge-v1.1.0-windows-x64.zip` (Pre-compiled standalone `clipbridge.exe`).
+* **Debian/Ubuntu**: `clipbridge_1.1.0_amd64.deb`.
 
 Usage
 -----

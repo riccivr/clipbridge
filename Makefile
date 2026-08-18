@@ -56,11 +56,24 @@ clean:
 	rm -f clipbridge $(OBJ) plugin.o platform_macos.o platform_posix.o platform_win32.o clipbridge-$(VERSION).tar.gz
 
 dist: clean
-	mkdir -p clipbridge-$(VERSION)/scripts
-	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.1 arg.h clipbridge.h clipbridge.c platform_posix.c platform_win32.c platform_macos.m scripts clipbridge-$(VERSION)
+	mkdir -p clipbridge-$(VERSION)/scripts clipbridge-$(VERSION)/packaging
+	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.1 arg.h clipbridge.h clipbridge.c platform_posix.c platform_win32.c platform_macos.m scripts packaging clipbridge-$(VERSION)
 	tar -cf clipbridge-$(VERSION).tar clipbridge-$(VERSION)
 	gzip clipbridge-$(VERSION).tar
 	rm -rf clipbridge-$(VERSION)
+
+deb: all
+	@T=$$(mktemp -d); \
+	mkdir -p $$T/DEBIAN $$T/usr/bin $$T/usr/share/man/man1; \
+	cp clipbridge $$T/usr/bin/; \
+	sed "s/VERSION/$(VERSION)/g" < clipbridge.1 > $$T/usr/share/man/man1/clipbridge.1; \
+	chmod 755 $$T/usr/bin/clipbridge; \
+	chmod 644 $$T/usr/share/man/man1/clipbridge.1; \
+	printf "Package: clipbridge\nVersion: $(VERSION)\nSection: utils\nPriority: optional\nArchitecture: amd64\nMaintainer: riccivr <riccivr@users.noreply.github.com>\nDescription: Universal clipboard bridge and background daemon powered by unipaste\n" > $$T/DEBIAN/control; \
+	chmod 755 $$T/DEBIAN; \
+	dpkg-deb --root-owner-group --build $$T clipbridge_$(VERSION)_amd64.deb; \
+	rm -rf $$T; \
+	echo "Built clipbridge_$(VERSION)_amd64.deb"
 
 dmg: all
 	sh scripts/build_dmg.sh
@@ -83,4 +96,4 @@ test: all
 	./clipbridge -h 2>&1 | grep -q "usage:"
 	@echo "[PASS] clipbridge CLI options verified"
 
-.PHONY: all clean dist dmg install uninstall test
+.PHONY: all clean dist deb dmg install uninstall test

@@ -1,0 +1,27 @@
+# Maintainer: riccivr <riccivr@users.noreply.github.com>
+pkgname=clipbridge
+pkgver=1.1.0
+pkgrel=1
+pkgdesc="Universal clipboard bridge and background daemon powered by unipaste"
+arch=('x86_64' 'aarch64' 'armv7h' 'i686')
+url="https://github.com/riccivr/clipbridge"
+license=('MIT')
+depends=('glibc')
+optdepends=(
+	'wl-clipboard: Wayland clipboard support'
+	'xclip: X11 clipboard support'
+	'xsel: Alternative X11 clipboard support'
+)
+source=("https://github.com/riccivr/clipbridge/releases/download/v${pkgver}/clipbridge-${pkgver}.tar.gz")
+sha256sums=('353352a3c2109f1425cf788d749e946836abb5db5e06c73f70bfbb86a1c3347d')
+
+build() {
+	cd "${pkgname}-${pkgver}"
+	make
+}
+
+package() {
+	cd "${pkgname}-${pkgver}"
+	make DESTDIR="${pkgdir}" PREFIX="/usr" install
+	install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
