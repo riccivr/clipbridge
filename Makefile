@@ -3,8 +3,14 @@
 
 include config.mk
 
-UNIPASTE_SRC = ../unipaste/parser.c ../unipaste/table.c ../unipaste/entity.c ../unipaste/strbuf.c
-UNIPASTE_OBJ = parser.o table.o entity.o strbuf.o
+PLUGIN_SRC = ../unipaste/plugin_none.c
+ifeq ($(SANITIZE),builtin)
+PLUGIN_SRC = ../unipaste/plugin_builtin.c
+CFLAGS += -DSANITIZE_BUILTIN
+endif
+
+UNIPASTE_SRC = ../unipaste/parser.c ../unipaste/table.c ../unipaste/entity.c ../unipaste/strbuf.c $(PLUGIN_SRC)
+UNIPASTE_OBJ = parser.o table.o entity.o strbuf.o plugin.o
 
 SRC = clipbridge.c platform_posix.c platform_win32.c
 OBJ = clipbridge.o platform_posix.o platform_win32.o $(UNIPASTE_OBJ)
@@ -26,11 +32,14 @@ entity.o: ../unipaste/entity.c
 strbuf.o: ../unipaste/strbuf.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
+plugin.o: $(PLUGIN_SRC)
+	$(CC) -c $(CFLAGS) $< -o $@
+
 clipbridge: $(OBJ)
 	$(CC) -o $@ $(OBJ) $(LDFLAGS)
 
 clean:
-	rm -f clipbridge $(OBJ) clipbridge-$(VERSION).tar.gz
+	rm -f clipbridge $(OBJ) plugin.o clipbridge-$(VERSION).tar.gz
 
 dist: clean
 	mkdir -p clipbridge-$(VERSION)
