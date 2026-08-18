@@ -32,13 +32,24 @@ clipbridge: $(OBJ)
 clean:
 	rm -f clipbridge $(OBJ) clipbridge-$(VERSION).tar.gz
 
+dist: clean
+	mkdir -p clipbridge-$(VERSION)
+	cp -R LICENSE Makefile README.md config.mk clipbridge.1 arg.h clipbridge.h clipbridge.c platform_posix.c platform_win32.c clipbridge-$(VERSION)
+	tar -cf clipbridge-$(VERSION).tar clipbridge-$(VERSION)
+	gzip clipbridge-$(VERSION).tar
+	rm -rf clipbridge-$(VERSION)
+
 install: all
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
 	cp -f clipbridge $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/clipbridge
+	mkdir -p $(DESTDIR)$(MANPREFIX)/man1
+	sed "s/VERSION/$(VERSION)/g" < clipbridge.1 > $(DESTDIR)$(MANPREFIX)/man1/clipbridge.1
+	chmod 644 $(DESTDIR)$(MANPREFIX)/man1/clipbridge.1
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/clipbridge
+	rm -f $(DESTDIR)$(MANPREFIX)/man1/clipbridge.1
 
 test: all
 	@echo "Running clipbridge smoke tests..."
@@ -46,4 +57,4 @@ test: all
 	./clipbridge -h 2>&1 | grep -q "usage:"
 	@echo "[PASS] clipbridge CLI options verified"
 
-.PHONY: all clean install uninstall test
+.PHONY: all clean dist install uninstall test

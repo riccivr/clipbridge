@@ -1,0 +1,54 @@
+.TH CLIPBRIDGE 1 clipbridge\-VERSION
+.SH NAME
+clipbridge \- universal clipboard bridge & background synchronization daemon
+.SH SYNOPSIS
+.B clipbridge
+.RB [ \-w1pruv ]
+.RB [ \-m
+.IR mode ]
+.RB [ \-t
+.IR table ]
+.RB [ \-l
+.IR link ]
+.SH DESCRIPTION
+.B clipbridge
+connects desktop graphical clipboards to the \fBunipaste\fR formatting engine.
+It intercepts rich clipboard payloads (such as HTML copied from Slack, Teams, or browsers)
+and automatically upgrades the fallback plain text on the system clipboard with
+cleanly aligned tables, code blocks, lists, and typography.
+.SH ACTIONS
+.TP
+.B \-w
+Watch the system clipboard continuously in the background (default).
+.TP
+.B \-1
+Perform a single clipboard synchronization and exit immediately (ideal for hotkey bindings).
+.TP
+.B \-p
+Print formatted clipboard text directly to standard output.
+.SH FORMATTING OPTIONS
+.TP
+.BI \-m " mode"
+Output mode: \fBplain\fR (default), \fBmarkdown\fR, or \fBterminal\fR.
+.TP
+.BI \-t " table"
+Table format: \fBgrid\fR (default), \fBmarkdown\fR, \fBtsv\fR, or \fBsimple\fR.
+.TP
+.BI \-l " link"
+Link format: \fBbracket\fR (default), \fBinline\fR, \fBtext\fR, or \fBfootnote\fR.
+.TP
+.B \-u
+Use Unicode box-drawing characters for tables.
+.TP
+.B \-r
+Emit Windows CRLF (\\r\\n) line endings.
+.TP
+.B \-v
+Display version information and exit.
+.TP
+.B \-h
+Display help message and exit.
+.SH AUTHORS
+Written by Ricardo.
+.SH LICENSE
+MIT License.
