@@ -70,12 +70,12 @@ lists, and clean typography:
 Features
 --------
 * **Powered by `unipaste`**: Leverages the high-performance, memory-safe, zero-dependency C99 parsing and formatting engine from `unipaste`.
-* **Zero external dependencies**: Built in pure C99 with standard POSIX and Win32 APIs.
+* **Zero external dependencies**: Built in pure C99 with standard POSIX, Win32, and AppKit APIs.
 * **Non-intrusive**: Leaves the original rich HTML payload untouched on the clipboard while seamlessly upgrading the plaintext fallback.
-* **Password Manager & Privacy Aware**: Automatically checks for and respects `Clipboard Viewer Ignore`, `CanIncludeInClipboardHistory`, and privacy exclusion flags (e.g. from 1Password, Bitwarden, KeePassXC).
+* **Password Manager & Privacy Aware**: Automatically checks for and respects `Clipboard Viewer Ignore`, `CanIncludeInClipboardHistory`, and `org.nspasteboard.ConcealedType` privacy exclusion flags (e.g. from 1Password, Bitwarden, KeePassXC, Apple Keychain).
 * **Multi-platform support**:
+  * **macOS**: Native Cocoa/AppKit `NSPasteboard` integration with changeCount tracking.
   * **Windows**: Native Win32 `AddClipboardFormatListener` (0% CPU when idle, zero polling).
-  * **macOS**: Native Cocoa/AppKit `NSPasteboard` integration with changeCount tracking and `org.nspasteboard.ConcealedType` privacy filtering.
   * **Linux (Wayland)**: Works with `wl-clipboard` (`wl-paste` / `wl-copy`).
   * **Linux (X11)**: Works with `xclip` or `xsel`.
 * **Flexible operation modes**:
@@ -83,14 +83,89 @@ Features
   * One-shot hotkey synchronization (`clipbridge -1`).
   * Direct terminal paste (`clipbridge -p`).
 
-Installation
-------------
-To build and install `clipbridge`:
+Installation & Platform Setup
+-----------------------------
 
-    make
-    make install
+### Option A: The "You Do It" / Suckless DIY Approach (Recommended)
+True to suckless software philosophy, `clipbridge` requires zero packaging layers and can be compiled and configured directly with standard POSIX tooling:
 
-On macOS, `make` automatically builds native Cocoa/AppKit pasteboard support (`-framework AppKit -framework Foundation`).
+#### 1. Compile & Install from Source (macOS, Linux, BSD)
+```sh
+git clone https://github.com/riccivr/clipbridge.git
+cd clipbridge
+make
+sudo make install
+```
+*(On macOS, `make` links against `-framework AppKit -framework Foundation` using native clang with 0 external dependencies).*
+
+#### 2. Manual Background Daemon on macOS (Launchd)
+Run `clipbridge` as a native user daemon on macOS without third-party app wrappers:
+```sh
+mkdir -p ~/Library/LaunchAgents
+cat << 'EOF' > ~/Library/LaunchAgents/com.riccivr.clipbridge.plist
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.riccivr.clipbridge</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/clipbridge</string>
+        <string>-w</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+EOF
+launchctl load ~/Library/LaunchAgents/com.riccivr.clipbridge.plist
+```
+
+#### 3. Manual Hotkey Binding on macOS
+To trigger one-shot formatting (`clipbridge -1`) with a global keyboard shortcut:
+* **With `skhd` (`~/.config/skhd/skhdrc`):**
+  ```
+  cmd + alt - v : /usr/local/bin/clipbridge -1
+  ```
+* **With Shortcuts.app:** Create a Quick Action shortcut running `/usr/local/bin/clipbridge -1` and assign a keyboard shortcut.
+
+#### 4. Linux Setup (i3 / Sway / Hyprland / Systemd)
+* **i3 / Sway (`~/.config/sway/config`):**
+  ```
+  bindsym $mod+Alt+v exec clipbridge -1
+  ```
+* **Hyprland (`~/.config/hypr/hyprland.conf`):**
+  ```
+  bind = $mainMod ALT, V, exec, clipbridge -1
+  ```
+* **Systemd User Daemon (`~/.config/systemd/user/clipbridge.service`):**
+  ```ini
+  [Unit]
+  Description=Universal Clipboard Bridge Daemon (powered by unipaste)
+  After=graphical-session.target
+
+  [Service]
+  ExecStart=/usr/local/bin/clipbridge -w
+  Restart=always
+
+  [Install]
+  WantedBy=graphical-session.target
+  ```
+  Enable and start: `systemctl --user enable --now clipbridge`
+
+#### 5. Windows Manual Setup
+Compile `clipbridge.exe` and create a shortcut in `shell:startup`.
+
+---
+
+### Option B: Pre-built Binary Packages (Releases)
+Pre-compiled standalone binaries and installer images are available on the [GitHub Releases](https://github.com/riccivr/clipbridge/releases) page:
+* **macOS**: `ClipBridge-1.1.0.dmg` (Drag-and-drop `ClipBridge.app` + one-click background daemon activator).
+* **Linux (x86_64)**: `clipbridge-v1.1.0-linux-x86_64.tar.gz` (Pre-compiled standalone binary).
+* **Windows (x64)**: `clipbridge-v1.1.0-windows-x64.zip` (Pre-compiled standalone `clipbridge.exe`).
 
 Usage
 -----
@@ -111,81 +186,6 @@ clipbridge [-w1pruv] [-m mode] [-t table] [-l link]
 * `-r`: Emit Windows CRLF (`\r\n`) line endings.
 * `-v`: Print version information.
 * `-h`: Display help message.
-
-Desktop Integration & Hotkeys
------------------------------
-### macOS (Launchd Background Agent)
-To run `clipbridge` continuously in the background on macOS:
-1. Create `~/Library/LaunchAgents/com.riccivr.clipbridge.plist`:
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.riccivr.clipbridge</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/local/bin/clipbridge</string>
-        <string>-w</string>
-    </array>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-</dict>
-</plist>
-```
-2. Load the agent:
-```bash
-launchctl load ~/Library/LaunchAgents/com.riccivr.clipbridge.plist
-```
-
-### macOS (Global Shortcut via Shortcuts.app or skhd)
-To bind a global hotkey (e.g. `Cmd+Opt+V`) to format the clipboard on demand:
-* **With skhd (`~/.config/skhd/skhdrc`):**
-  ```
-  cmd + alt - v : /usr/local/bin/clipbridge -1
-  ```
-* **With macOS Shortcuts.app:**
-  Create a Quick Action shortcut with "Run Shell Script: `/usr/local/bin/clipbridge -1`" and assign a keyboard shortcut in System Settings -> Keyboard -> Shortcuts.
-
-### Windows (Startup / Autostart)
-To have `clipbridge` monitor the clipboard automatically on Windows:
-1. Compile `clipbridge.exe` or place it in your `%PATH%`.
-2. Create a shortcut to `clipbridge.exe` in `shell:startup`.
-
-### Linux (i3 / Sway / Hyprland Hotkeys)
-Bind a hotkey to format the current clipboard on demand:
-
-**i3 / Sway (`~/.config/sway/config` or `~/.config/i3/config`):**
-```
-bindsym $mod+Alt+v exec clipbridge -1
-```
-
-**Hyprland (`~/.config/hypr/hyprland.conf`):**
-```
-bind = $mainMod ALT, V, exec, clipbridge -1
-```
-
-### Linux (Systemd User Service)
-Create `~/.config/systemd/user/clipbridge.service`:
-```ini
-[Unit]
-Description=Universal Clipboard Bridge Daemon (powered by unipaste)
-After=graphical-session.target
-
-[Service]
-ExecStart=/usr/local/bin/clipbridge -w
-Restart=always
-
-[Install]
-WantedBy=graphical-session.target
-```
-Enable and start:
-```bash
-systemctl --user enable --now clipbridge
-```
 
 License
 -------
