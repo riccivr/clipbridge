@@ -75,9 +75,9 @@ Features
 * **Password Manager & Privacy Aware**: Automatically checks for and respects `Clipboard Viewer Ignore`, `CanIncludeInClipboardHistory`, and privacy exclusion flags (e.g. from 1Password, Bitwarden, KeePassXC).
 * **Multi-platform support**:
   * **Windows**: Native Win32 `AddClipboardFormatListener` (0% CPU when idle, zero polling).
+  * **macOS**: Native Cocoa/AppKit `NSPasteboard` integration with changeCount tracking and `org.nspasteboard.ConcealedType` privacy filtering.
   * **Linux (Wayland)**: Works with `wl-clipboard` (`wl-paste` / `wl-copy`).
   * **Linux (X11)**: Works with `xclip` or `xsel`.
-  * **macOS**: Works with `pbpaste` / `pbcopy`.
 * **Flexible operation modes**:
   * Continuous background watcher (`clipbridge -w`).
   * One-shot hotkey synchronization (`clipbridge -1`).
@@ -89,6 +89,8 @@ To build and install `clipbridge`:
 
     make
     make install
+
+On macOS, `make` automatically builds native Cocoa/AppKit pasteboard support (`-framework AppKit -framework Foundation`).
 
 Usage
 -----
@@ -112,6 +114,42 @@ clipbridge [-w1pruv] [-m mode] [-t table] [-l link]
 
 Desktop Integration & Hotkeys
 -----------------------------
+### macOS (Launchd Background Agent)
+To run `clipbridge` continuously in the background on macOS:
+1. Create `~/Library/LaunchAgents/com.riccivr.clipbridge.plist`:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.riccivr.clipbridge</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/clipbridge</string>
+        <string>-w</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+```
+2. Load the agent:
+```bash
+launchctl load ~/Library/LaunchAgents/com.riccivr.clipbridge.plist
+```
+
+### macOS (Global Shortcut via Shortcuts.app or skhd)
+To bind a global hotkey (e.g. `Cmd+Opt+V`) to format the clipboard on demand:
+* **With skhd (`~/.config/skhd/skhdrc`):**
+  ```
+  cmd + alt - v : /usr/local/bin/clipbridge -1
+  ```
+* **With macOS Shortcuts.app:**
+  Create a Quick Action shortcut with "Run Shell Script: `/usr/local/bin/clipbridge -1`" and assign a keyboard shortcut in System Settings -> Keyboard -> Shortcuts.
+
 ### Windows (Startup / Autostart)
 To have `clipbridge` monitor the clipboard automatically on Windows:
 1. Compile `clipbridge.exe` or place it in your `%PATH%`.

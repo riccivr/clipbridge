@@ -3,6 +3,8 @@
 
 include config.mk
 
+UNAME_S := $(shell uname -s)
+
 PLUGIN_SRC = ../unipaste/plugin_none.c
 ifeq ($(SANITIZE),builtin)
 PLUGIN_SRC = ../unipaste/plugin_builtin.c
@@ -12,12 +14,24 @@ endif
 UNIPASTE_SRC = ../unipaste/parser.c ../unipaste/table.c ../unipaste/entity.c ../unipaste/strbuf.c $(PLUGIN_SRC)
 UNIPASTE_OBJ = parser.o table.o entity.o strbuf.o plugin.o
 
-SRC = clipbridge.c platform_posix.c platform_win32.c
-OBJ = clipbridge.o platform_posix.o platform_win32.o $(UNIPASTE_OBJ)
+ifeq ($(UNAME_S),Darwin)
+PLATFORM_SRC = platform_macos.m
+PLATFORM_OBJ = platform_macos.o
+LDFLAGS += -framework AppKit -framework Foundation
+else
+PLATFORM_SRC = platform_posix.c platform_win32.c
+PLATFORM_OBJ = platform_posix.o platform_win32.o
+endif
+
+SRC = clipbridge.c $(PLATFORM_SRC)
+OBJ = clipbridge.o $(PLATFORM_OBJ) $(UNIPASTE_OBJ)
 
 all: clipbridge
 
 .c.o:
+	$(CC) -c $(CFLAGS) $<
+
+.m.o:
 	$(CC) -c $(CFLAGS) $<
 
 parser.o: ../unipaste/parser.c
@@ -39,11 +53,11 @@ clipbridge: $(OBJ)
 	$(CC) -o $@ $(OBJ) $(LDFLAGS)
 
 clean:
-	rm -f clipbridge $(OBJ) plugin.o clipbridge-$(VERSION).tar.gz
+	rm -f clipbridge $(OBJ) plugin.o platform_macos.o platform_posix.o platform_win32.o clipbridge-$(VERSION).tar.gz
 
 dist: clean
 	mkdir -p clipbridge-$(VERSION)
-	cp -R LICENSE Makefile README.md config.mk clipbridge.1 arg.h clipbridge.h clipbridge.c platform_posix.c platform_win32.c clipbridge-$(VERSION)
+	cp -R LICENSE Makefile README.md config.mk clipbridge.1 arg.h clipbridge.h clipbridge.c platform_posix.c platform_win32.c platform_macos.m clipbridge-$(VERSION)
 	tar -cf clipbridge-$(VERSION).tar clipbridge-$(VERSION)
 	gzip clipbridge-$(VERSION).tar
 	rm -rf clipbridge-$(VERSION)

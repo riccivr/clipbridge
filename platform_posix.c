@@ -1,5 +1,5 @@
 /* See LICENSE file for copyright and license details. */
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__APPLE__)
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,28 +22,20 @@ sig_handler(int sig)
 static const char *
 get_read_html_cmd(void)
 {
-#ifdef __APPLE__
-	return "pbpaste -Prefer html 2>/dev/null";
-#else
 	if (getenv("WAYLAND_DISPLAY"))
 		return "wl-paste -t text/html 2>/dev/null";
 	else
 		return "xclip -selection clipboard -t text/html -o 2>/dev/null || xsel -b -t text/html 2>/dev/null";
-#endif
 }
 
 /* Determine the available clipboard write command for plain text */
 static const char *
 get_write_text_cmd(void)
 {
-#ifdef __APPLE__
-	return "pbcopy";
-#else
 	if (getenv("WAYLAND_DISPLAY"))
 		return "wl-copy -t text/plain";
 	else
 		return "xclip -selection clipboard || xsel -b -i";
-#endif
 }
 
 int
@@ -158,7 +150,7 @@ clipboard_watch(const struct config *cfg)
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
 
-	printf("clipbridge: monitoring clipboard (press Ctrl+C to stop)...\n");
+	printf("clipbridge: monitoring Linux/BSD clipboard (press Ctrl+C to stop)...\n");
 	fflush(stdout);
 
 	while (running) {
@@ -196,4 +188,4 @@ clipboard_watch(const struct config *cfg)
 
 #else
 typedef int iso_c_dummy_clipbridge_posix;
-#endif /* !_WIN32 */
+#endif /* !defined(_WIN32) && !defined(__APPLE__) */
