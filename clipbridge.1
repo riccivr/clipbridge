@@ -1,6 +1,6 @@
 .TH CLIPBRIDGE 1 clipbridge\-VERSION
 .SH NAME
-clipbridge \- universal clipboard bridge & background synchronization daemon
+clipbridge \- universal clipboard bridge & background daemon powered by unipaste
 .SH SYNOPSIS
 .B clipbridge
 .RB [ \-w1pruv ]
@@ -14,8 +14,8 @@ clipbridge \- universal clipboard bridge & background synchronization daemon
 .B clipbridge
 connects desktop graphical clipboards to the \fBunipaste\fR formatting engine.
 It intercepts rich clipboard payloads (such as HTML copied from Slack, Teams, or browsers)
-and automatically upgrades the fallback plain text on the system clipboard with
-cleanly aligned tables, code blocks, lists, and typography.
+and automatically upgrades the fallback plain text on the system clipboard using
+\fBunipaste\fR's table alignment, list hierarchy, and code block formatting.
 .SH ACTIONS
 .TP
 .B \-w
