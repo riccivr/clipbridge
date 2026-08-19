@@ -1,6 +1,6 @@
 .TH CLIPBRIDGE 1 clipbridge\-VERSION
 .SH NAME
-clipbridge \- universal clipboard bridge & background daemon powered by unipaste
+clipbridge \- clipboard listener and daemon powered by unipaste
 .SH SYNOPSIS
 .B clipbridge
 .RB [ \-w1pruv ]
@@ -12,20 +12,18 @@ clipbridge \- universal clipboard bridge & background daemon powered by unipaste
 .IR link ]
 .SH DESCRIPTION
 .B clipbridge
-connects desktop graphical clipboards to the \fBunipaste\fR formatting engine.
-It intercepts rich clipboard payloads (such as HTML copied from Slack, Teams, or browsers)
-and automatically upgrades the fallback plain text on the system clipboard using
-\fBunipaste\fR's table alignment, list hierarchy, and code block formatting.
+monitors the system clipboard for rich HTML updates, formats the HTML using the
+\fBunipaste\fR engine, and updates the clipboard plain-text slot.
 .SH ACTIONS
 .TP
 .B \-w
-Watch the system clipboard continuously in the background (default).
+Watch the system clipboard in the background (default).
 .TP
 .B \-1
-Perform a single clipboard synchronization and exit immediately (ideal for hotkey bindings).
+Format current clipboard once and exit.
 .TP
 .B \-p
-Print formatted clipboard text directly to standard output.
+Print formatted clipboard text to stdout.
 .SH FORMATTING OPTIONS
 .TP
 .BI \-m " mode"
@@ -44,7 +42,7 @@ Use Unicode box-drawing characters for tables.
 Emit Windows CRLF (\\r\\n) line endings.
 .TP
 .B \-v
-Display version information and exit.
+Display version and exit.
 .TP
 .B \-h
 Display help message and exit.

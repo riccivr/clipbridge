@@ -1,5 +1,8 @@
 clipbridge
+clipbridge.exe
 *.o
 *.tar.gz
+*.zip
+*.deb
 *.dmg
 build/
