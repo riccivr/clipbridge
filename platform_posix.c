@@ -137,6 +137,24 @@ clipboard_paste_stdout(const struct config *cfg)
 }
 
 int
+clipboard_paste_active(const struct config *cfg)
+{
+	int ret = clipboard_sync_once(cfg);
+	if (ret != 0)
+		return ret;
+
+	/* Synthesize paste keystroke using ydotool, wtype, or xdotool */
+	if (system("which ydotool >/dev/null 2>&1") == 0) {
+		return system("ydotool key 29:1 47:1 47:0 29:0");
+	} else if (system("which wtype >/dev/null 2>&1") == 0) {
+		return system("wtype -M ctrl -k v -m ctrl");
+	} else if (system("which xdotool >/dev/null 2>&1") == 0) {
+		return system("xdotool key --clearmodifiers ctrl+v");
+	}
+	return 0;
+}
+
+int
 clipboard_watch(const struct config *cfg)
 {
 	char *last_html = NULL;

@@ -12,16 +12,18 @@ char *argv0;
 enum bridge_action {
 	ACTION_WATCH = 0,
 	ACTION_ONCE,
-	ACTION_PASTE
+	ACTION_PASTE,
+	ACTION_PASTE_ACTIVE
 };
 
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-w1pruv] [-m mode] [-t table] [-l link]\n", argv0);
+	fprintf(stderr, "usage: %s [-w1kpruv] [-m mode] [-t table] [-l link]\n", argv0);
 	fprintf(stderr, "\nActions:\n");
 	fprintf(stderr, "  -w         Watch clipboard continuously and auto-sync (default)\n");
 	fprintf(stderr, "  -1         Perform single clipboard synchronization and exit\n");
+	fprintf(stderr, "  -k         Paste formatted clipboard directly into active window\n");
 	fprintf(stderr, "  -p         Print formatted clipboard content directly to stdout\n");
 	fprintf(stderr, "\nFormatting Options:\n");
 	fprintf(stderr, "  -m mode    Output mode: plain (default), markdown, terminal\n");
@@ -75,6 +77,9 @@ main(int argc, char *argv[])
 		break;
 	case '1':
 		action = ACTION_ONCE;
+		break;
+	case 'k':
+		action = ACTION_PASTE_ACTIVE;
 		break;
 	case 'p':
 		action = ACTION_PASTE;
@@ -141,6 +146,8 @@ main(int argc, char *argv[])
 		return clipboard_sync_once(&cfg);
 	case ACTION_PASTE:
 		return clipboard_paste_stdout(&cfg);
+	case ACTION_PASTE_ACTIVE:
+		return clipboard_paste_active(&cfg);
 	case ACTION_WATCH:
 	default:
 		return clipboard_watch(&cfg);

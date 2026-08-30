@@ -134,6 +134,18 @@ clipboard_paste_stdout(const struct config *cfg)
 }
 
 int
+clipboard_paste_active(const struct config *cfg)
+{
+	int ret = clipboard_sync_once(cfg);
+	if (ret != 0)
+		return ret;
+
+	/* Synthesize Cmd+V keystroke using AppleScript */
+	system("osascript -e 'tell application \"System Events\" to keystroke \"v\" using command down' 2>/dev/null");
+	return 0;
+}
+
+int
 clipboard_watch(const struct config *cfg)
 {
 	struct sigaction sa;

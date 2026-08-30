@@ -10,17 +10,20 @@
 #include "unipaste.h"
 
 #define WM_TRAYICON (WM_USER + 1)
-#define ID_TRAY_TOGGLE_ENABLED   1001
-#define ID_TRAY_MODE_PLAIN       1002
-#define ID_TRAY_MODE_MARKDOWN    1003
-#define ID_TRAY_MODE_TERMINAL    1004
-#define ID_TRAY_TABLE_GRID       1005
-#define ID_TRAY_TABLE_UNICODE    1006
-#define ID_TRAY_TABLE_MARKDOWN   1007
-#define ID_TRAY_TABLE_TSV        1008
-#define ID_TRAY_STARTUP          1009
-#define ID_TRAY_SYNC_NOW         1010
+#define ID_TRAY_PASTE_NOW        1001
+#define ID_TRAY_AUTO_FORMAT      1002
+#define ID_TRAY_MODE_PLAIN       1003
+#define ID_TRAY_MODE_MARKDOWN    1004
+#define ID_TRAY_MODE_TERMINAL    1005
+#define ID_TRAY_TABLE_GRID       1006
+#define ID_TRAY_TABLE_UNICODE    1007
+#define ID_TRAY_TABLE_MARKDOWN   1008
+#define ID_TRAY_TABLE_TSV        1009
+#define ID_TRAY_STARTUP          1010
 #define ID_TRAY_EXIT             1011
+
+#define ID_HOTKEY_CTRL_ALT_V     2001
+#define ID_HOTKEY_WIN_ALT_V      2002
 
 static UINT cf_html = 0;
 static UINT cf_ignore = 0;
@@ -28,7 +31,7 @@ static UINT cf_no_history = 0;
 static UINT cf_no_cloud = 0;
 static DWORD last_seq = 0;
 static struct config current_cfg;
-static int is_enabled = 1;
+static int auto_format_default = 0; /* Off by default: Ctrl+C / Ctrl+V stay normal */
 static NOTIFYICONDATAA nid;
 static HWND g_hwnd = NULL;
 
@@ -190,6 +193,56 @@ clipboard_paste_stdout(const struct config *cfg)
 	return ret;
 }
 
+/* Synthesize a Ctrl+V paste keystroke to the active focused control */
+static void
+simulate_ctrl_v(void)
+{
+	INPUT inputs[4];
+	memset(inputs, 0, sizeof(inputs));
+
+	/* Ctrl key DOWN */
+	inputs[0].type = INPUT_KEYBOARD;
+	inputs[0].ki.wVk = VK_CONTROL;
+
+	/* V key DOWN */
+	inputs[1].type = INPUT_KEYBOARD;
+	inputs[1].ki.wVk = 'V';
+
+	/* V key UP */
+	inputs[2].type = INPUT_KEYBOARD;
+	inputs[2].ki.wVk = 'V';
+	inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+
+	/* Ctrl key UP */
+	inputs[3].type = INPUT_KEYBOARD;
+	inputs[3].ki.wVk = VK_CONTROL;
+	inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
+
+	SendInput(4, inputs, sizeof(INPUT));
+}
+
+int
+clipboard_paste_active(const struct config *cfg)
+{
+	char *html = NULL;
+	size_t len = 0;
+
+	if (clipboard_read_html(&html, &len) == 0 && html && len > 0) {
+		struct config c = current_cfg;
+		if (cfg)
+			c = *cfg;
+		c.crlf = 1;
+		process_html_to_clipboard(html, len, &c);
+		last_seq = GetClipboardSequenceNumber();
+		free(html);
+	}
+
+	/* Brief delay to allow modifiers to release before simulating Ctrl+V */
+	Sleep(50);
+	simulate_ctrl_v();
+	return 0;
+}
+
 static int
 is_startup_enabled(void)
 {
@@ -224,10 +277,10 @@ set_startup_enabled(int enable)
 static void
 update_tray_tooltip(void)
 {
-	if (is_enabled) {
-		snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Active)");
+	if (auto_format_default) {
+		snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Auto-format Ctrl+V enabled)");
 	} else {
-		snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Paused)");
+		snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Press Ctrl+Alt+V to paste)");
 	}
 	Shell_NotifyIconA(NIM_MODIFY, &nid);
 }
@@ -242,8 +295,12 @@ show_tray_menu(HWND hwnd)
 
 	GetCursorPos(&pt);
 
-	/* Status item */
-	AppendMenuA(hMenu, (is_enabled ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TOGGLE_ENABLED, is_enabled ? "Enabled" : "Paused (Click to Enable)");
+	/* Instant Paste Action */
+	AppendMenuA(hMenu, MF_STRING, ID_TRAY_PASTE_NOW, "Paste with ClipBridge\tCtrl+Alt+V");
+	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
+
+	/* Auto-format default toggle (Off by default, user can turn on) */
+	AppendMenuA(hMenu, (auto_format_default ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_AUTO_FORMAT, "Auto-Format Default Paste (Ctrl+V)");
 	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
 
 	/* Mode submenu */
@@ -261,7 +318,6 @@ show_tray_menu(HWND hwnd)
 
 	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
 	AppendMenuA(hMenu, (is_startup_enabled() ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_STARTUP, "Start with Windows");
-	AppendMenuA(hMenu, MF_STRING, ID_TRAY_SYNC_NOW, "Sync Clipboard Now");
 	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
 	AppendMenuA(hMenu, MF_STRING, ID_TRAY_EXIT, "Exit ClipBridge");
 
@@ -279,7 +335,7 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	switch (msg) {
 	case WM_CLIPBOARDUPDATE: {
-		if (!is_enabled)
+		if (!auto_format_default)
 			return 0;
 
 		DWORD seq = GetClipboardSequenceNumber();
@@ -299,12 +355,18 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		return 0;
 	}
 
+	case WM_HOTKEY: {
+		if (wParam == ID_HOTKEY_CTRL_ALT_V || wParam == ID_HOTKEY_WIN_ALT_V) {
+			clipboard_paste_active(&current_cfg);
+		}
+		return 0;
+	}
+
 	case WM_TRAYICON: {
 		if (lParam == WM_RBUTTONUP) {
 			show_tray_menu(hwnd);
 		} else if (lParam == WM_LBUTTONDBLCLK || lParam == WM_LBUTTONUP) {
-			is_enabled = !is_enabled;
-			update_tray_tooltip();
+			clipboard_paste_active(&current_cfg);
 		}
 		return 0;
 	}
@@ -312,8 +374,11 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_COMMAND: {
 		int wmId = LOWORD(wParam);
 		switch (wmId) {
-		case ID_TRAY_TOGGLE_ENABLED:
-			is_enabled = !is_enabled;
+		case ID_TRAY_PASTE_NOW:
+			clipboard_paste_active(&current_cfg);
+			break;
+		case ID_TRAY_AUTO_FORMAT:
+			auto_format_default = !auto_format_default;
 			update_tray_tooltip();
 			break;
 		case ID_TRAY_MODE_PLAIN:
@@ -342,9 +407,6 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case ID_TRAY_STARTUP:
 			set_startup_enabled(!is_startup_enabled());
 			break;
-		case ID_TRAY_SYNC_NOW:
-			clipboard_sync_once(&current_cfg);
-			break;
 		case ID_TRAY_EXIT:
 			PostQuitMessage(0);
 			break;
@@ -353,6 +415,8 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	}
 
 	case WM_DESTROY:
+		UnregisterHotKey(hwnd, ID_HOTKEY_CTRL_ALT_V);
+		UnregisterHotKey(hwnd, ID_HOTKEY_WIN_ALT_V);
 		Shell_NotifyIconA(NIM_DELETE, &nid);
 		PostQuitMessage(0);
 		return 0;
@@ -393,6 +457,10 @@ clipboard_watch(const struct config *cfg)
 		return 1;
 	}
 
+	/* Register global hotkeys: Ctrl+Alt+V and Win+Alt+V */
+	RegisterHotKey(g_hwnd, ID_HOTKEY_CTRL_ALT_V, MOD_CONTROL | MOD_ALT, 'V');
+	RegisterHotKey(g_hwnd, ID_HOTKEY_WIN_ALT_V, MOD_WIN | MOD_ALT, 'V');
+
 	/* Initialize and display system tray notification icon */
 	memset(&nid, 0, sizeof(nid));
 	nid.cbSize = sizeof(NOTIFYICONDATAA);
@@ -401,7 +469,7 @@ clipboard_watch(const struct config *cfg)
 	nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
 	nid.uCallbackMessage = WM_TRAYICON;
 	nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Active)");
+	snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Press Ctrl+Alt+V to paste)");
 
 	Shell_NotifyIconA(NIM_ADD, &nid);
 
@@ -411,6 +479,8 @@ clipboard_watch(const struct config *cfg)
 	}
 
 	RemoveClipboardFormatListener(g_hwnd);
+	UnregisterHotKey(g_hwnd, ID_HOTKEY_CTRL_ALT_V);
+	UnregisterHotKey(g_hwnd, ID_HOTKEY_WIN_ALT_V);
 	Shell_NotifyIconA(NIM_DELETE, &nid);
 	DestroyWindow(g_hwnd);
 	return 0;

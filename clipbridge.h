@@ -11,6 +11,7 @@ int clipboard_read_html(char **out_html, size_t *out_len);
 int clipboard_write_text(const char *text, size_t len);
 int clipboard_sync_once(const struct config *cfg);
 int clipboard_paste_stdout(const struct config *cfg);
+int clipboard_paste_active(const struct config *cfg);
 int clipboard_watch(const struct config *cfg);
 
 #endif /* CLIPBRIDGE_H */

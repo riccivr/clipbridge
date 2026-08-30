@@ -138,21 +138,29 @@ To format on demand (`clipbridge -1`) using a keyboard shortcut:
   ```
   Enable and start: `systemctl --user enable --now clipbridge`
 
-### Windows System Tray & Startup
-When running `clipbridge.exe` on Windows, it runs silently in the background with zero terminal window and adds an icon to the system notification area (system tray):
-* **Left click or double click**: Quickly toggle formatting on or pause.
-* **Right click menu**: Change output mode (Plain, Markdown, ANSI), select table format (ASCII, Unicode, Markdown, TSV), run one-shot sync, or toggle **Start with Windows** (automatically registers into Windows startup).
+### Windows System Tray & Hotkey
+When running `clipbridge.exe` on Windows, it runs silently in the notification tray with zero terminal windows:
+* **Normal copy/paste unchanged**: `Ctrl+C` and `Ctrl+V` keep their standard OS behavior by default.
+* **Paste with ClipBridge (`Ctrl+Alt+V` / `Win+Alt+V`)**: Formats the clipboard and pastes directly into whatever window is currently active.
+* **Right click tray menu**:
+  * **Paste with ClipBridge**: Instantly formats and pastes.
+  * **Auto-Format Default Paste (Ctrl+V)**: Optional toggle to make standard `Ctrl+V` always auto-format on every copy.
+  * **Output Mode**: Plain Text, Markdown, or Terminal ANSI.
+  * **Table Style**: ASCII Box, Unicode Grid, Markdown Pipe, TSV.
+  * **Start with Windows**: Toggle automatic startup at login.
+  * **Exit ClipBridge**: Stop and remove tray icon.
 
 Usage
 -----
 ```
-clipbridge [-w1pruv] [-m mode] [-t table] [-l link]
+clipbridge [-w1kpruv] [-m mode] [-t table] [-l link]
 ```
 
 ### Actions
-* `-w`: Watch clipboard continuously in background and format updates (default).
-* `-1`: Format current clipboard once and exit (for hotkey bindings).
-* `-p`: Print formatted clipboard content to stdout.
+* `-w`: Watch clipboard in background and listen for hotkeys (default).
+* `-k`: Format clipboard and paste directly into active focused window.
+* `-1`: Format current clipboard once and update clipboard text.
+* `-p`: Print formatted clipboard content directly to stdout.
 
 ### Formatting Options
 * `-m mode`: Output mode: `plain` (default), `markdown`, `terminal`.
