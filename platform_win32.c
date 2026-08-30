@@ -280,6 +280,38 @@ set_startup_enabled(int enable)
 }
 
 static void
+save_language_preference(enum lang_id lang)
+{
+	HKEY hKey;
+	if (RegCreateKeyExA(HKEY_CURRENT_USER, "Software\\ClipBridge", 0, NULL, 0, KEY_SET_VALUE, NULL, &hKey, NULL) == ERROR_SUCCESS) {
+		const char *val = "auto";
+		if (lang == LANG_EN) val = "en";
+		else if (lang == LANG_ES) val = "es";
+		RegSetValueExA(hKey, "Language", 0, REG_SZ, (const BYTE *)val, (DWORD)strlen(val) + 1);
+		RegCloseKey(hKey);
+	}
+}
+
+static enum lang_id
+load_language_preference(void)
+{
+	HKEY hKey;
+	if (RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\ClipBridge", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+		char buf[32];
+		DWORD len = sizeof(buf);
+		DWORD type = 0;
+		if (RegQueryValueExA(hKey, "Language", NULL, &type, (LPBYTE)buf, &len) == ERROR_SUCCESS) {
+			RegCloseKey(hKey);
+			if (strcmp(buf, "en") == 0) return LANG_EN;
+			if (strcmp(buf, "es") == 0) return LANG_ES;
+			return LANG_AUTO;
+		}
+		RegCloseKey(hKey);
+	}
+	return LANG_AUTO;
+}
+
+static void
 update_tray_tooltip(void)
 {
 	snprintf(nid.szTip, sizeof(nid.szTip), "%s", i18n_get(auto_format_default ? STR_TOOLTIP_AUTO : STR_TOOLTIP_ACTIVE));
@@ -416,14 +448,17 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			break;
 		case ID_TRAY_LANG_AUTO:
 			i18n_set_language(LANG_AUTO);
+			save_language_preference(LANG_AUTO);
 			update_tray_tooltip();
 			break;
 		case ID_TRAY_LANG_EN:
 			i18n_set_language(LANG_EN);
+			save_language_preference(LANG_EN);
 			update_tray_tooltip();
 			break;
 		case ID_TRAY_LANG_ES:
 			i18n_set_language(LANG_ES);
+			save_language_preference(LANG_ES);
 			update_tray_tooltip();
 			break;
 		case ID_TRAY_STARTUP:
@@ -467,8 +502,8 @@ clipboard_watch(const struct config *cfg)
 	}
 	current_cfg.crlf = 1;
 
-	/* Initialize i18n subsystem */
-	i18n_init(LANG_AUTO);
+	/* Initialize i18n subsystem with saved user preference */
+	i18n_init(load_language_preference());
 
 	/* Singleton Enforcement: Allow only 1 running daemon instance */
 	HANDLE hMutex = CreateMutexA(NULL, TRUE, "Local\\ClipBridge_SingleInstance_Mutex_Ricci");
