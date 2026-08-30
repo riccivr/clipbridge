@@ -64,12 +64,15 @@ dist: clean
 
 deb: all
 	@T=$$(mktemp -d); \
-	mkdir -p $$T/DEBIAN $$T/usr/bin $$T/usr/share/man/man1; \
+	mkdir -p $$T/DEBIAN $$T/usr/bin $$T/usr/share/man/man1 $$T/usr/share/applications $$T/usr/share/icons/hicolor/scalable/apps $$T/usr/share/pixmaps; \
 	cp clipbridge $$T/usr/bin/; \
 	sed "s/VERSION/$(VERSION)/g" < clipbridge.1 > $$T/usr/share/man/man1/clipbridge.1; \
+	cp packaging/clipbridge.desktop $$T/usr/share/applications/; \
+	cp assets/clipbridge.svg $$T/usr/share/icons/hicolor/scalable/apps/; \
+	cp assets/clipbridge.png $$T/usr/share/pixmaps/; \
 	chmod 755 $$T/usr/bin/clipbridge; \
-	chmod 644 $$T/usr/share/man/man1/clipbridge.1; \
-	printf "Package: clipbridge\nVersion: $(VERSION)\nSection: utils\nPriority: optional\nArchitecture: amd64\nMaintainer: riccivr <riccivr@users.noreply.github.com>\nDescription: Universal clipboard bridge and background daemon powered by unipaste\n" > $$T/DEBIAN/control; \
+	chmod 644 $$T/usr/share/man/man1/clipbridge.1 $$T/usr/share/applications/clipbridge.desktop $$T/usr/share/icons/hicolor/scalable/apps/clipbridge.svg $$T/usr/share/pixmaps/clipbridge.png; \
+	printf "Package: clipbridge\nVersion: $(VERSION)\nSection: utils\nPriority: optional\nArchitecture: amd64\nMaintainer: Ricardo Veronese Ricci <riccivr@users.noreply.github.com>\nDescription: Universal clipboard bridge and background daemon powered by unipaste\n" > $$T/DEBIAN/control; \
 	chmod 755 $$T/DEBIAN; \
 	dpkg-deb --root-owner-group --build $$T clipbridge_$(VERSION)_amd64.deb; \
 	rm -rf $$T; \
@@ -91,10 +94,22 @@ install: all
 	mkdir -p $(DESTDIR)$(MANPREFIX)/man1
 	sed "s/VERSION/$(VERSION)/g" < clipbridge.1 > $(DESTDIR)$(MANPREFIX)/man1/clipbridge.1
 	chmod 644 $(DESTDIR)$(MANPREFIX)/man1/clipbridge.1
+	mkdir -p $(DESTDIR)$(PREFIX)/share/applications
+	cp -f packaging/clipbridge.desktop $(DESTDIR)$(PREFIX)/share/applications/clipbridge.desktop
+	chmod 644 $(DESTDIR)$(PREFIX)/share/applications/clipbridge.desktop
+	mkdir -p $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps
+	cp -f assets/clipbridge.svg $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/clipbridge.svg
+	chmod 644 $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/clipbridge.svg
+	mkdir -p $(DESTDIR)$(PREFIX)/share/pixmaps
+	cp -f assets/clipbridge.png $(DESTDIR)$(PREFIX)/share/pixmaps/clipbridge.png
+	chmod 644 $(DESTDIR)$(PREFIX)/share/pixmaps/clipbridge.png
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/clipbridge
 	rm -f $(DESTDIR)$(MANPREFIX)/man1/clipbridge.1
+	rm -f $(DESTDIR)$(PREFIX)/share/applications/clipbridge.desktop
+	rm -f $(DESTDIR)$(PREFIX)/share/icons/hicolor/scalable/apps/clipbridge.svg
+	rm -f $(DESTDIR)$(PREFIX)/share/pixmaps/clipbridge.png
 
 test: all
 	@echo "Running clipbridge smoke tests..."

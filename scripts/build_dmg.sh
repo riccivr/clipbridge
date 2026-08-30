@@ -24,6 +24,9 @@ fi
 cp clipbridge "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/clipbridge"
 chmod 755 "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/clipbridge"
 cp Info.plist "${STAGING_DIR}/${APP_NAME}.app/Contents/Info.plist"
+if [ -f "assets/AppIcon.icns" ]; then
+    cp assets/AppIcon.icns "${STAGING_DIR}/${APP_NAME}.app/Contents/Resources/AppIcon.icns"
+fi
 
 # Add /Applications symlink for standard drag-and-drop installation
 ln -s /Applications "${STAGING_DIR}/Applications"

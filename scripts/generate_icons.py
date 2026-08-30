@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
-import shutil
+import struct
+import io
 from PIL import Image, ImageDraw
 
 SRC_LOGO = "/mnt/c/Users/ricci/.gemini/antigravity/brain/30df34ec-5d4a-49e2-a886-a604571b4ba8/clipbridge_logo_1788099993501.jpg"
@@ -11,7 +12,8 @@ os.makedirs(ASSETS_DIR, exist_ok=True)
 if os.path.exists(SRC_LOGO):
     img = Image.open(SRC_LOGO).convert("RGBA")
     img.save(os.path.join(ASSETS_DIR, "logo.png"), format="PNG", optimize=True)
-    print("Saved assets/logo.png")
+    img.resize((256, 256), Image.Resampling.LANCZOS).save(os.path.join(ASSETS_DIR, "clipbridge.png"), format="PNG")
+    print("Saved assets/logo.png & assets/clipbridge.png")
 
 # 2. Crisp Monochrome Vector SVG (macOS menu bar / Linux status / Windows tray)
 svg_monochrome = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -28,14 +30,15 @@ svg_monochrome = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" 
 
 with open(os.path.join(ASSETS_DIR, "tray_icon.svg"), "w") as f:
     f.write(svg_monochrome)
-print("Saved assets/tray_icon.svg")
+with open(os.path.join(ASSETS_DIR, "clipbridge.svg"), "w") as f:
+    f.write(svg_monochrome)
+print("Saved assets/tray_icon.svg & assets/clipbridge.svg")
 
 # 3. Generate high-contrast monochrome tray icons for macOS / Linux / Windows
 def create_monochrome_icon(size):
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     
-    # Scaling factor
     s = size / 24.0
     sw = max(1, int(round(1.8 * s)))
     
@@ -47,11 +50,8 @@ def create_monochrome_icon(size):
     draw.rounded_rectangle([7.5*s, 2*s, 16.5*s, 5.5*s], radius=int(1*s), fill=(255, 255, 255, 255))
     
     # Bridge flow waves
-    # Line 1: 4,11 -> 8,11 -> 13,13 -> 20,13
     draw.line([(4*s, 11*s), (8*s, 11*s), (13*s, 13*s), (19*s, 13*s)], fill=(255, 255, 255, 255), width=sw)
-    # Line 2: 4,15 -> 8,15 -> 13,13 -> 19,13
-    draw.line([(4*s, 15*s), (8*s, 15*s), (13*s, 13*s)], fill=(255, 255, 255, 255), width=sw)
-    # Line 3 (Clean text block): 14,17 -> 18,17
+    draw.line([(4*s, 15*s), (8*s, 15*s), (13*s, 13*s), (19*s, 13*s)], fill=(255, 255, 255, 255), width=sw)
     draw.line([(14*s, 17*s), (18*s, 17*s)], fill=(255, 255, 255, 255), width=sw)
 
     return img
@@ -78,3 +78,33 @@ if os.path.exists(SRC_LOGO):
         append_images=ico_images[1:]
     )
     print("Saved assets/icon.ico")
+
+# Generate macOS AppIcon.icns
+if os.path.exists(SRC_LOGO):
+    base_logo = Image.open(SRC_LOGO).convert("RGBA")
+    icns_entries = [
+        (b'icp4', 16),
+        (b'icp5', 32),
+        (b'icp6', 64),
+        (b'ic07', 128),
+        (b'ic08', 256),
+        (b'ic09', 512),
+        (b'ic10', 1024),
+    ]
+    icns_body = bytearray()
+    for ostype, sz in icns_entries:
+        resized = base_logo.resize((sz, sz), Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        resized.save(buf, format="PNG")
+        png_bytes = buf.getvalue()
+        # Entry header: 4-byte OSType, 4-byte length (header + data)
+        entry_len = 8 + len(png_bytes)
+        icns_body.extend(ostype)
+        icns_body.extend(struct.pack('>I', entry_len))
+        icns_body.extend(png_bytes)
+    
+    total_len = 8 + len(icns_body)
+    icns_data = b'icns' + struct.pack('>I', total_len) + icns_body
+    with open(os.path.join(ASSETS_DIR, "AppIcon.icns"), "wb") as f:
+        f.write(icns_data)
+    print("Saved assets/AppIcon.icns")

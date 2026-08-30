@@ -16,11 +16,13 @@
     <string>1.1.0</string>
     <key>CFBundleVersion</key>
     <string>1.1.0</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.13</string>
     <key>LSUIElement</key>
     <true/>
     <key>NSHumanReadableCopyright</key>
-    <string>Copyright © 2026 riccivr. MIT License.</string>
+    <string>Copyright © 2026 Ricardo Veronese Ricci. MIT License.</string>
 </dict>
 </plist>

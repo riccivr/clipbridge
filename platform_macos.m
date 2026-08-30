@@ -11,14 +11,9 @@
 #include "clipbridge.h"
 #include "unipaste.h"
 
-static volatile sig_atomic_t running = 1;
-
-static void
-sig_handler(int sig)
-{
-	(void)sig;
-	running = 0;
-}
+static struct config current_cfg;
+static BOOL auto_format_default = NO;
+static NSInteger last_change = 0;
 
 /* Check if clipboard is marked concealed/private by password managers */
 static int
@@ -145,48 +140,287 @@ clipboard_paste_active(const struct config *cfg)
 	return 0;
 }
 
+static BOOL
+is_launch_agent_enabled(void)
+{
+	NSString *path = [@"~/Library/LaunchAgents/com.riccivr.clipbridge.plist" stringByExpandingTildeInPath];
+	return [[NSFileManager defaultManager] fileExistsAtPath:path];
+}
+
+static void
+set_launch_agent_enabled(BOOL enable)
+{
+	NSString *dir = [@"~/Library/LaunchAgents" stringByExpandingTildeInPath];
+	NSString *path = [dir stringByAppendingPathComponent:@"com.riccivr.clipbridge.plist"];
+
+	if (enable) {
+		[[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+		NSString *execPath = [[NSBundle mainBundle] executablePath];
+		if (!execPath || [execPath length] == 0) {
+			execPath = @"/usr/local/bin/clipbridge";
+		}
+		NSString *plistContent = [NSString stringWithFormat:
+			@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+			@"<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+			@"<plist version=\"1.0\">\n"
+			@"<dict>\n"
+			@"    <key>Label</key>\n"
+			@"    <string>com.riccivr.clipbridge</string>\n"
+			@"    <key>ProgramArguments</key>\n"
+			@"    <array>\n"
+			@"        <string>%@</string>\n"
+			@"        <string>-w</string>\n"
+			@"    </array>\n"
+			@"    <key>RunAtLoad</key>\n"
+			@"    <true/>\n"
+			@"    <key>KeepAlive</key>\n"
+			@"    <true/>\n"
+			@"</dict>\n"
+			@"</plist>\n", execPath];
+		[plistContent writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
+		system([[NSString stringWithFormat:@"launchctl load '%@' 2>/dev/null", path] UTF8String]);
+	} else {
+		system([[NSString stringWithFormat:@"launchctl unload '%@' 2>/dev/null", path] UTF8String]);
+		[[NSFileManager defaultManager] removeItemAtPath:path error:nil];
+	}
+}
+
+/* Vector status bar template icon (adapts automatically to macOS Dark/Light menu bar) */
+static NSImage *
+create_status_bar_template_icon(void)
+{
+	NSImage *img = [NSImage imageWithSize:NSMakeSize(18, 18) flipped:NO drawingHandler:^BOOL(NSRect dstRect) {
+		(void)dstRect;
+		[[NSColor blackColor] setStroke];
+		[[NSColor blackColor] setFill];
+
+		/* Board outline */
+		NSBezierPath *board = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(3.5, 1.5, 11, 14) xRadius:1.5 yRadius:1.5];
+		[board setLineWidth:1.5];
+		[board stroke];
+
+		/* Clip top */
+		NSRectFill(NSMakeRect(6, 13, 6, 2.5));
+		NSRectFill(NSMakeRect(7, 14.5, 4, 1.5));
+
+		/* Bridge / text lines */
+		NSBezierPath *lines = [NSBezierPath bezierPath];
+		[lines moveToPoint:NSMakePoint(5.5, 9.5)];
+		[lines lineToPoint:NSMakePoint(12.5, 9.5)];
+		[lines moveToPoint:NSMakePoint(5.5, 6.5)];
+		[lines lineToPoint:NSMakePoint(12.5, 6.5)];
+		[lines moveToPoint:NSMakePoint(5.5, 3.5)];
+		[lines lineToPoint:NSMakePoint(10.5, 3.5)];
+		[lines setLineWidth:1.2];
+		[lines stroke];
+
+		return YES;
+	}];
+	[img setTemplate:YES];
+	return img;
+}
+
+@interface ClipBridgeAppDelegate : NSObject <NSApplicationDelegate>
+@property (strong, nonatomic) NSStatusItem *statusItem;
+@property (strong, nonatomic) NSTimer *pollTimer;
+@property (strong, nonatomic) NSMenuItem *autoFormatItem;
+@property (strong, nonatomic) NSMenuItem *startupItem;
+@end
+
+@implementation ClipBridgeAppDelegate
+
+- (void)applicationDidFinishLaunching:(NSNotification *)notification {
+	(void)notification;
+	[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+
+	self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
+	NSStatusBarButton *button = self.statusItem.button;
+	if (button) {
+		button.image = create_status_bar_template_icon();
+		button.toolTip = @"ClipBridge (Press Cmd+Alt+V to paste)";
+	}
+
+	[self buildMenu];
+
+	last_change = [[NSPasteboard generalPasteboard] changeCount];
+	self.pollTimer = [NSTimer scheduledTimerWithTimeInterval:0.25 target:self selector:@selector(pollClipboard:) userInfo:nil repeats:YES];
+}
+
+- (void)buildMenu {
+	NSMenu *menu = [[NSMenu alloc] initWithTitle:@"ClipBridge"];
+
+	/* Paste with ClipBridge */
+	NSMenuItem *pasteItem = [[NSMenuItem alloc] initWithTitle:@"Paste with ClipBridge" action:@selector(actionPasteActive:) keyEquivalent:@"v"];
+	[pasteItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagOption)];
+	[pasteItem setTarget:self];
+	[menu addItem:pasteItem];
+
+	[menu addItem:[NSMenuItem separatorItem]];
+
+	/* Auto-format default paste */
+	self.autoFormatItem = [[NSMenuItem alloc] initWithTitle:@"Auto-Format Default Paste (Cmd+V)" action:@selector(toggleAutoFormat:) keyEquivalent:@""];
+	[self.autoFormatItem setTarget:self];
+	[self.autoFormatItem setState:(auto_format_default ? NSControlStateValueOn : NSControlStateValueOff)];
+	[menu addItem:self.autoFormatItem];
+
+	[menu addItem:[NSMenuItem separatorItem]];
+
+	/* Mode Submenu */
+	NSMenuItem *modeParent = [[NSMenuItem alloc] initWithTitle:@"Output Mode" action:nil keyEquivalent:@""];
+	NSMenu *modeMenu = [[NSMenu alloc] initWithTitle:@"Output Mode"];
+	
+	NSMenuItem *mPlain = [[NSMenuItem alloc] initWithTitle:@"Plain Text (TextEdit / Terminal)" action:@selector(setModePlain:) keyEquivalent:@""];
+	[mPlain setTarget:self];
+	[mPlain setState:(current_cfg.mode == MODE_PLAIN ? NSControlStateValueOn : NSControlStateValueOff)];
+	[modeMenu addItem:mPlain];
+
+	NSMenuItem *mMarkdown = [[NSMenuItem alloc] initWithTitle:@"GitHub-Flavored Markdown" action:@selector(setModeMarkdown:) keyEquivalent:@""];
+	[mMarkdown setTarget:self];
+	[mMarkdown setState:(current_cfg.mode == MODE_MARKDOWN ? NSControlStateValueOn : NSControlStateValueOff)];
+	[modeMenu addItem:mMarkdown];
+
+	NSMenuItem *mTerminal = [[NSMenuItem alloc] initWithTitle:@"Terminal ANSI" action:@selector(setModeTerminal:) keyEquivalent:@""];
+	[mTerminal setTarget:self];
+	[mTerminal setState:(current_cfg.mode == MODE_TERMINAL ? NSControlStateValueOn : NSControlStateValueOff)];
+	[modeMenu addItem:mTerminal];
+
+	[modeParent setSubmenu:modeMenu];
+	[menu addItem:modeParent];
+
+	/* Table Submenu */
+	NSMenuItem *tableParent = [[NSMenuItem alloc] initWithTitle:@"Table Style" action:nil keyEquivalent:@""];
+	NSMenu *tableMenu = [[NSMenu alloc] initWithTitle:@"Table Style"];
+
+	NSMenuItem *tGrid = [[NSMenuItem alloc] initWithTitle:@"ASCII Box (+---+)" action:@selector(setTableGrid:) keyEquivalent:@""];
+	[tGrid setTarget:self];
+	[tGrid setState:(current_cfg.table_style == TABLE_STYLE_GRID && !current_cfg.unicode_tables ? NSControlStateValueOn : NSControlStateValueOff)];
+	[tableMenu addItem:tGrid];
+
+	NSMenuItem *tUnicode = [[NSMenuItem alloc] initWithTitle:@"Unicode Grid (┌───┐)" action:@selector(setTableUnicode:) keyEquivalent:@""];
+	[tUnicode setTarget:self];
+	[tUnicode setState:(current_cfg.unicode_tables ? NSControlStateValueOn : NSControlStateValueOff)];
+	[tableMenu addItem:tUnicode];
+
+	NSMenuItem *tMd = [[NSMenuItem alloc] initWithTitle:@"Markdown Pipe Table" action:@selector(setTableMarkdown:) keyEquivalent:@""];
+	[tMd setTarget:self];
+	[tMd setState:(current_cfg.table_style == TABLE_STYLE_MARKDOWN ? NSControlStateValueOn : NSControlStateValueOff)];
+	[tableMenu addItem:tMd];
+
+	NSMenuItem *tTsv = [[NSMenuItem alloc] initWithTitle:@"Tab-Separated (TSV)" action:@selector(setTableTsv:) keyEquivalent:@""];
+	[tTsv setTarget:self];
+	[tTsv setState:(current_cfg.table_style == TABLE_STYLE_TSV ? NSControlStateValueOn : NSControlStateValueOff)];
+	[tableMenu addItem:tTsv];
+
+	[tableParent setSubmenu:tableMenu];
+	[menu addItem:tableParent];
+
+	[menu addItem:[NSMenuItem separatorItem]];
+
+	/* Start with macOS Login */
+	self.startupItem = [[NSMenuItem alloc] initWithTitle:@"Start with macOS Login" action:@selector(toggleStartup:) keyEquivalent:@""];
+	[self.startupItem setTarget:self];
+	[self.startupItem setState:(is_launch_agent_enabled() ? NSControlStateValueOn : NSControlStateValueOff)];
+	[menu addItem:self.startupItem];
+
+	/* About ClipBridge */
+	NSMenuItem *aboutItem = [[NSMenuItem alloc] initWithTitle:@"About ClipBridge..." action:@selector(showAbout:) keyEquivalent:@""];
+	[aboutItem setTarget:self];
+	[menu addItem:aboutItem];
+
+	[menu addItem:[NSMenuItem separatorItem]];
+
+	/* Quit */
+	NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit ClipBridge" action:@selector(quitApp:) keyEquivalent:@"q"];
+	[quitItem setTarget:self];
+	[menu addItem:quitItem];
+
+	self.statusItem.menu = menu;
+}
+
+- (void)pollClipboard:(NSTimer *)timer {
+	(void)timer;
+	if (!auto_format_default)
+		return;
+
+	@autoreleasepool {
+		NSPasteboard *pboard = [NSPasteboard generalPasteboard];
+		NSInteger cur_change = [pboard changeCount];
+		if (cur_change != last_change) {
+			last_change = cur_change;
+			char *html = NULL;
+			size_t len = 0;
+			if (clipboard_read_html(&html, &len) == 0 && html && len > 0) {
+				process_html_to_clipboard(html, len, &current_cfg);
+				last_change = [pboard changeCount];
+				free(html);
+			}
+		}
+	}
+}
+
+- (void)actionPasteActive:(id)sender {
+	(void)sender;
+	clipboard_paste_active(&current_cfg);
+}
+
+- (void)toggleAutoFormat:(id)sender {
+	(void)sender;
+	auto_format_default = !auto_format_default;
+	[self buildMenu];
+}
+
+- (void)setModePlain:(id)sender { (void)sender; current_cfg.mode = MODE_PLAIN; [self buildMenu]; }
+- (void)setModeMarkdown:(id)sender { (void)sender; current_cfg.mode = MODE_MARKDOWN; [self buildMenu]; }
+- (void)setModeTerminal:(id)sender { (void)sender; current_cfg.mode = MODE_TERMINAL; [self buildMenu]; }
+- (void)setTableGrid:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_GRID; current_cfg.unicode_tables = 0; [self buildMenu]; }
+- (void)setTableUnicode:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_GRID; current_cfg.unicode_tables = 1; [self buildMenu]; }
+- (void)setTableMarkdown:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_MARKDOWN; [self buildMenu]; }
+- (void)setTableTsv:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_TSV; [self buildMenu]; }
+
+- (void)toggleStartup:(id)sender {
+	(void)sender;
+	set_launch_agent_enabled(!is_launch_agent_enabled());
+	[self buildMenu];
+}
+
+- (void)showAbout:(id)sender {
+	(void)sender;
+	NSAlert *alert = [[NSAlert alloc] init];
+	[alert setMessageText:@"ClipBridge - Universal Clipboard Daemon"];
+	[alert setInformativeText:[NSString stringWithFormat:
+		@"Version: %s\n\n"
+		@"Author: Ricardo Veronese Ricci\n"
+		@"GitHub: https://github.com/riccivr/clipbridge\n\n"
+		@"A lightweight clipboard formatting bridge powered by unipaste.\n"
+		@"License: MIT License", VERSION]];
+	[alert setAlertStyle:NSAlertStyleInformational];
+	[alert addButtonWithTitle:@"OK"];
+	[alert runModal];
+}
+
+- (void)quitApp:(id)sender {
+	(void)sender;
+	[NSApp terminate:nil];
+}
+
+@end
+
 int
 clipboard_watch(const struct config *cfg)
 {
-	struct sigaction sa;
-	NSInteger last_change;
-
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = sig_handler;
-	sigaction(SIGINT, &sa, NULL);
-	sigaction(SIGTERM, &sa, NULL);
-
-	printf("clipbridge: monitoring macOS pasteboard (press Ctrl+C to stop)...\n");
-	fflush(stdout);
+	if (cfg) {
+		current_cfg = *cfg;
+	} else {
+		memset(&current_cfg, 0, sizeof(current_cfg));
+		current_cfg.mode = MODE_PLAIN;
+	}
 
 	@autoreleasepool {
-		last_change = [[NSPasteboard generalPasteboard] changeCount];
+		NSApplication *app = [NSApplication sharedApplication];
+		ClipBridgeAppDelegate *delegate = [[ClipBridgeAppDelegate alloc] init];
+		[app setDelegate:delegate];
+		[app run];
 	}
-
-	while (running) {
-		@autoreleasepool {
-			NSPasteboard *pboard = [NSPasteboard generalPasteboard];
-			NSInteger cur_change = [pboard changeCount];
-
-			if (cur_change != last_change) {
-				last_change = cur_change;
-
-				char *html = NULL;
-				size_t len = 0;
-				if (clipboard_read_html(&html, &len) == 0 && html && len > 0) {
-					process_html_to_clipboard(html, len, cfg);
-					last_change = [pboard changeCount];
-					printf("clipbridge: [synced] formatted %zu bytes of rich text -> plain text\n", len);
-					fflush(stdout);
-					free(html);
-				}
-			}
-		}
-
-		usleep(250000); /* 250ms check interval */
-	}
-
-	printf("\nclipbridge: stopped cleanly.\n");
 	return 0;
 }
 

@@ -1,0 +1,20 @@
+[Desktop Entry]
+Name=ClipBridge
+GenericName=Clipboard Formatting Bridge
+Comment=Universal clipboard daemon powered by unipaste
+Exec=clipbridge -w
+Icon=clipbridge
+Terminal=false
+Type=Application
+Categories=Utility;System;
+Keywords=clipboard;daemon;markdown;table;unipaste;formatter;
+StartupNotify=false
+Actions=PasteActive;SyncOnce;
+
+[Desktop Action PasteActive]
+Name=Paste with ClipBridge
+Exec=clipbridge -k
+
+[Desktop Action SyncOnce]
+Name=Sync Clipboard Now
+Exec=clipbridge -1
