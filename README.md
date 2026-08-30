@@ -70,10 +70,10 @@ choco install clipbridge
 
 ---
 
-### Pre-built Binaries and DMG
+### Pre-built Packages and Binaries
 Download pre-built packages from [GitHub Releases](https://github.com/riccivr/clipbridge/releases):
 * macOS: `ClipBridge-1.1.0.dmg` (`ClipBridge.app` plus a daemon installer script).
-* Windows: `clipbridge-v1.1.0-windows-x64.zip` (`clipbridge.exe`).
+* Windows: `clipbridge.exe` (standalone executable) and `clipbridge-v1.1.0-windows-x64.zip`.
 * Linux: `clipbridge-v1.1.0-linux-x86_64.tar.gz`.
 * Debian / Ubuntu: `clipbridge_1.1.0_amd64.deb`.
 

@@ -75,6 +75,10 @@ deb: all
 	rm -rf $$T; \
 	echo "Built clipbridge_$(VERSION)_amd64.deb"
 
+CC_WIN32 ?= x86_64-w64-mingw32-gcc
+exe:
+	$(CC_WIN32) $(CFLAGS) -D_WIN32 clipbridge.c platform_win32.c $(UNIPASTE_SRC) -o clipbridge.exe -s -luser32
+
 dmg: all
 	sh scripts/build_dmg.sh
 
@@ -96,4 +100,4 @@ test: all
 	./clipbridge -h 2>&1 | grep -q "usage:"
 	@echo "[PASS] clipbridge CLI options verified"
 
-.PHONY: all clean dist deb dmg install uninstall test
+.PHONY: all clean dist deb exe dmg install uninstall test
