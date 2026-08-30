@@ -19,25 +19,28 @@ enum bridge_action {
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-w1kpruv] [-m mode] [-t table] [-l link]\n", argv0);
+	fprintf(stderr, "usage: %s [-w1kpruv] [-m mode] [-t table] [-l link] [--uninstall]\n", argv0);
 	fprintf(stderr, "\nActions:\n");
-	fprintf(stderr, "  -w         Watch clipboard continuously and auto-sync (default)\n");
-	fprintf(stderr, "  -1         Perform single clipboard synchronization and exit\n");
-	fprintf(stderr, "  -k         Paste formatted clipboard directly into active window\n");
-	fprintf(stderr, "  -p         Print formatted clipboard content directly to stdout\n");
+	fprintf(stderr, "  -w            Watch clipboard continuously and auto-sync (default)\n");
+	fprintf(stderr, "  -1            Perform single clipboard synchronization and exit\n");
+	fprintf(stderr, "  -k            Paste formatted clipboard directly into active window\n");
+	fprintf(stderr, "  -p            Print formatted clipboard content directly to stdout\n");
+	fprintf(stderr, "  --uninstall   Uninstall ClipBridge desktop shortcuts and user configuration\n");
 	fprintf(stderr, "\nFormatting Options:\n");
-	fprintf(stderr, "  -m mode    Output mode: plain (default), markdown, terminal\n");
-	fprintf(stderr, "  -t table   Table format: grid (default), markdown, tsv, simple\n");
-	fprintf(stderr, "  -l link    Link format: bracket (default), inline, text, footnote\n");
-	fprintf(stderr, "  -u         Use Unicode box-drawing characters for tables\n");
-	fprintf(stderr, "  -r         Emit Windows CRLF (\\r\\n) line endings\n");
-	fprintf(stderr, "  -v         Display version information\n");
-	fprintf(stderr, "  -h         Display this help message\n");
+	fprintf(stderr, "  -m mode       Output mode: plain (default), markdown, terminal\n");
+	fprintf(stderr, "  -t table      Table format: grid (default), markdown, tsv, simple\n");
+	fprintf(stderr, "  -l link       Link format: bracket (default), inline, text, footnote\n");
+	fprintf(stderr, "  -u            Use Unicode box-drawing characters for tables\n");
+	fprintf(stderr, "  -r            Emit Windows CRLF (\\r\\n) line endings\n");
+	fprintf(stderr, "  -v            Display version information\n");
+	fprintf(stderr, "  -h            Display this help message\n");
 	exit(1);
 }
 
 #ifdef _WIN32
 #include <windows.h>
+#include <shlobj.h>
+
 static void
 attach_console_if_needed(int argc)
 {
@@ -48,6 +51,72 @@ attach_console_if_needed(int argc)
 			freopen("CONIN$", "r", stdin);
 		}
 	}
+}
+
+static int
+perform_uninstall(void)
+{
+	wchar_t localAppData[MAX_PATH * 2];
+	HKEY hKey;
+
+	HWND existing = FindWindowA("ClipBridgeMonitorClass", "ClipBridge");
+	if (existing) {
+		PostMessageA(existing, WM_COMMAND, 1015, 0);
+		Sleep(400);
+	}
+
+	if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_PROGRAMS, NULL, 0, localAppData))) {
+		wchar_t shortcutPath[MAX_PATH * 2];
+		_snwprintf(shortcutPath, sizeof(shortcutPath) / sizeof(wchar_t), L"%ls\\ClipBridge.lnk", localAppData);
+		DeleteFileW(shortcutPath);
+	}
+
+	if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+		RegDeleteValueW(hKey, L"ClipBridge");
+		RegCloseKey(hKey);
+	}
+
+	RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipBridge");
+	RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\ClipBridge");
+
+	if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+		wchar_t appDir[MAX_PATH * 2];
+		_snwprintf(appDir, sizeof(appDir) / sizeof(wchar_t), L"%ls\\ClipBridge", localAppData);
+		char cmd[MAX_PATH * 3];
+		snprintf(cmd, sizeof(cmd), "/C ping 127.0.0.1 -n 2 > nul & rd /S /Q \"%ls\"", appDir);
+		ShellExecuteA(NULL, "open", "cmd.exe", cmd, NULL, SW_HIDE);
+	}
+
+	MessageBoxA(NULL, "ClipBridge has been uninstalled successfully.", "ClipBridge Uninstall", MB_OK | MB_ICONINFORMATION);
+	return 0;
+}
+#elif defined(__APPLE__)
+static int
+perform_uninstall(void)
+{
+	printf("Uninstalling ClipBridge on macOS...\n");
+	system("launchctl unload ~/Library/LaunchAgents/com.riccivr.clipbridge.plist 2>/dev/null || true");
+	system("rm -f ~/Library/LaunchAgents/com.riccivr.clipbridge.plist");
+	system("defaults delete com.riccivr.clipbridge 2>/dev/null || true");
+	system("rm -rf ~/Library/Preferences/com.riccivr.clipbridge.plist");
+	system("rm -rf /Applications/ClipBridge.app 2>/dev/null || true");
+	printf("ClipBridge uninstalled successfully.\n");
+	return 0;
+}
+#else
+static int
+perform_uninstall(void)
+{
+	printf("Uninstalling ClipBridge on Linux...\n");
+	system("systemctl --user stop clipbridge.service 2>/dev/null || true");
+	system("systemctl --user disable clipbridge.service 2>/dev/null || true");
+	system("rm -f ~/.config/systemd/user/clipbridge.service");
+	system("rm -f ~/.local/share/applications/clipbridge.desktop");
+	system("rm -f ~/.local/share/icons/hicolor/scalable/apps/clipbridge.svg");
+	system("rm -f ~/.local/share/pixmaps/clipbridge.png");
+	system("rm -rf ~/.config/clipbridge");
+	printf("ClipBridge desktop shortcuts and user configuration uninstalled.\n");
+	return 0;
 }
 #endif
 
@@ -61,6 +130,13 @@ main(int argc, char *argv[])
 #ifdef _WIN32
 	attach_console_if_needed(argc);
 #endif
+
+	/* Handle --uninstall flag before getopt / arg parsing */
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--uninstall") == 0 || strcmp(argv[i], "-u") == 0 && (i + 1 < argc && strcmp(argv[i+1], "ninstall") == 0)) {
+			return perform_uninstall();
+		}
+	}
 
 	/* Default config */
 	memset(&cfg, 0, sizeof(cfg));

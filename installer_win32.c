@@ -168,17 +168,144 @@ show_success_taskdialog(HINSTANCE hInstance, enum lang_id lang)
 		MB_OK | MB_ICONINFORMATION);
 }
 
+static int
+perform_windows_uninstallation(HINSTANCE hInstance)
+{
+	/* 1. Detect saved language preference */
+	enum lang_id lang = LANG_EN;
+	HKEY hKey;
+	if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\ClipBridge", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+		wchar_t buf[32];
+		DWORD len = sizeof(buf);
+		if (RegQueryValueExW(hKey, L"Language", NULL, NULL, (LPBYTE)buf, &len) == ERROR_SUCCESS) {
+			if (wcscmp(buf, L"es") == 0) lang = LANG_ES;
+		}
+		RegCloseKey(hKey);
+	}
+
+	/* 2. Ask confirmation via TaskDialog */
+	HMODULE hComCtl = LoadLibraryW(L"comctl32.dll");
+	if (hComCtl) {
+		PFN_TaskDialogIndirect pfnTaskDialogIndirect = 
+			(PFN_TaskDialogIndirect)GetProcAddress(hComCtl, "TaskDialogIndirect");
+
+		if (pfnTaskDialogIndirect) {
+			TASKDIALOG_BUTTON buttons[] = {
+				{ 101, (lang == LANG_ES)
+					? L"Desinstalar ClipBridge\nEliminar ClipBridge y todos sus componentes"
+					: L"Uninstall ClipBridge\nRemove ClipBridge and all its components" }
+			};
+
+			TASKDIALOGCONFIG tc;
+			memset(&tc, 0, sizeof(tc));
+			tc.cbSize = sizeof(tc);
+			tc.hInstance = hInstance;
+			tc.dwFlags = TDF_USE_COMMAND_LINKS | TDF_ALLOW_DIALOG_CANCELLATION | TDF_CAN_BE_MINIMIZED | TDF_USE_HICON_MAIN;
+			tc.hMainIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
+			tc.pszWindowTitle = L"ClipBridge Uninstall";
+			tc.pszMainInstruction = (lang == LANG_ES) ? L"\u00bfDesea desinstalar ClipBridge?" : L"Do you want to uninstall ClipBridge?";
+			tc.pszContent = (lang == LANG_ES)
+				? L"Esto cerrar\u00e1 cualquier instancia activa y eliminar\u00e1 ClipBridge de su equipo."
+				: L"This will close any active background instance and remove ClipBridge from your computer.";
+			tc.cButtons = 1;
+			tc.pButtons = buttons;
+			tc.dwCommonButtons = TDCBF_CANCEL_BUTTON;
+
+			int clickedButton = 0;
+			HRESULT hr = pfnTaskDialogIndirect(&tc, &clickedButton, NULL, NULL);
+			if (SUCCEEDED(hr)) {
+				if (clickedButton != 101) return 0;
+			}
+		}
+	}
+
+	/* 3. Terminate running daemon instance */
+	HWND existing = FindWindowA("ClipBridgeMonitorClass", "ClipBridge");
+	if (existing) {
+		PostMessageA(existing, WM_COMMAND, 1015 /* ID_TRAY_EXIT */, 0);
+		Sleep(400);
+	}
+
+	/* 4. Remove Start Menu Shortcut */
+	wchar_t startMenuDir[MAX_PATH * 2];
+	if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_PROGRAMS, NULL, 0, startMenuDir))) {
+		wchar_t shortcutPath[MAX_PATH * 2];
+		_snwprintf(shortcutPath, sizeof(shortcutPath) / sizeof(wchar_t), L"%ls\\ClipBridge.lnk", startMenuDir);
+		DeleteFileW(shortcutPath);
+	}
+
+	/* 5. Remove Run at Startup registry value */
+	if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+		RegDeleteValueW(hKey, L"ClipBridge");
+		RegCloseKey(hKey);
+	}
+
+	/* 6. Remove Uninstall registry entries */
+	RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipBridge");
+	RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\ClipBridge");
+
+	/* 7. Remove AppData directory */
+	wchar_t localAppData[MAX_PATH * 2];
+	if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
+		wchar_t appDir[MAX_PATH * 2];
+		_snwprintf(appDir, sizeof(appDir) / sizeof(wchar_t), L"%ls\\ClipBridge", localAppData);
+		wchar_t exePath[MAX_PATH * 2];
+		_snwprintf(exePath, sizeof(exePath) / sizeof(wchar_t), L"%ls\\clipbridge.exe", appDir);
+		DeleteFileW(exePath);
+		RemoveDirectoryW(appDir);
+
+		/* Background fallback self-delete */
+		char cmd[MAX_PATH * 3];
+		snprintf(cmd, sizeof(cmd), "/C ping 127.0.0.1 -n 2 > nul & rd /S /Q \"%ls\"", appDir);
+		ShellExecuteA(NULL, "open", "cmd.exe", cmd, NULL, SW_HIDE);
+	}
+
+	/* 8. Success notification */
+	if (hComCtl) {
+		PFN_TaskDialogIndirect pfnTaskDialogIndirect = 
+			(PFN_TaskDialogIndirect)GetProcAddress(hComCtl, "TaskDialogIndirect");
+
+		if (pfnTaskDialogIndirect) {
+			TASKDIALOGCONFIG tc;
+			memset(&tc, 0, sizeof(tc));
+			tc.cbSize = sizeof(tc);
+			tc.hInstance = hInstance;
+			tc.dwFlags = TDF_ALLOW_DIALOG_CANCELLATION | TDF_CAN_BE_MINIMIZED | TDF_USE_HICON_MAIN;
+			tc.hMainIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
+			tc.pszWindowTitle = L"ClipBridge Uninstall";
+			tc.pszMainInstruction = (lang == LANG_ES) ? L"\u00a1ClipBridge se ha desinstalado correctamente!" : L"ClipBridge Uninstalled Successfully!";
+			tc.pszContent = (lang == LANG_ES)
+				? L"ClipBridge y todos sus componentes han sido eliminados de su equipo."
+				: L"ClipBridge and all its components have been removed from your computer.";
+			tc.dwCommonButtons = TDCBF_OK_BUTTON;
+			pfnTaskDialogIndirect(&tc, NULL, NULL, NULL);
+			return 0;
+		}
+	}
+
+	MessageBoxW(NULL,
+		(lang == LANG_ES) ? L"¡ClipBridge se ha desinstalado correctamente!" : L"ClipBridge has been uninstalled successfully!",
+		L"ClipBridge Uninstall",
+		MB_OK | MB_ICONINFORMATION);
+
+	return 0;
+}
+
 int WINAPI
 wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
 	(void)hPrevInstance;
-	(void)pCmdLine;
 	(void)nCmdShow;
 
 	INITCOMMONCONTROLSEX icex;
 	icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
 	icex.dwICC = ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES;
 	InitCommonControlsEx(&icex);
+
+	/* Check for --uninstall flag */
+	if (pCmdLine && (wcsstr(pCmdLine, L"--uninstall") != NULL || wcsstr(pCmdLine, L"-u") != NULL || wcsstr(pCmdLine, L"/uninstall") != NULL)) {
+		return perform_windows_uninstallation(hInstance);
+	}
 
 	wchar_t localAppData[MAX_PATH * 2];
 	wchar_t appDir[MAX_PATH * 2];

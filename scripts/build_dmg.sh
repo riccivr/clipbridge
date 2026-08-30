@@ -70,6 +70,20 @@ read -p "Press Enter to finish..."
 EOF
 chmod 755 "${STAGING_DIR}/Enable_Background_Daemon.command"
 
+# Add Uninstall helper command
+cat << 'EOF' > "${STAGING_DIR}/Uninstall_ClipBridge.command"
+#!/bin/bash
+echo "Uninstalling ClipBridge..."
+launchctl unload "$HOME/Library/LaunchAgents/com.riccivr.clipbridge.plist" 2>/dev/null || true
+rm -f "$HOME/Library/LaunchAgents/com.riccivr.clipbridge.plist"
+defaults delete com.riccivr.clipbridge 2>/dev/null || true
+rm -rf "$HOME/Library/Preferences/com.riccivr.clipbridge.plist"
+rm -rf "/Applications/ClipBridge.app"
+echo "ClipBridge has been completely uninstalled from your Mac!"
+read -p "Press Enter to exit..."
+EOF
+chmod 755 "${STAGING_DIR}/Uninstall_ClipBridge.command"
+
 # Copy documentation
 cp README.md "${STAGING_DIR}/"
 cp LICENSE "${STAGING_DIR}/"
