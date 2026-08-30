@@ -190,6 +190,16 @@ set_launch_agent_enabled(BOOL enable)
 static NSImage *
 create_status_bar_template_icon(void)
 {
+	NSString *iconPath = [[NSBundle mainBundle] pathForResource:@"tray_template" ofType:@"png"];
+	if (iconPath) {
+		NSImage *img = [[NSImage alloc] initWithContentsOfFile:iconPath];
+		if (img) {
+			[img setTemplate:YES];
+			[img setSize:NSMakeSize(18, 18)];
+			return img;
+		}
+	}
+
 	NSImage *img = [NSImage imageWithSize:NSMakeSize(18, 18) flipped:NO drawingHandler:^BOOL(NSRect dstRect) {
 		(void)dstRect;
 		[[NSColor blackColor] setStroke];
