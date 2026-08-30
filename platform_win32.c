@@ -413,7 +413,7 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			MessageBoxA(hwnd,
 				"ClipBridge - Universal Clipboard Daemon\n"
 				"Version: " VERSION "\n\n"
-				"Author: Ricardo Ricci\n"
+				"Author: Ricardo Veronese Ricci\n"
 				"GitHub: https://github.com/riccivr/clipbridge\n\n"
 				"A lightweight clipboard formatting bridge powered by unipaste.\n"
 				"License: MIT License",

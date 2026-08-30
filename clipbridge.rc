@@ -15,11 +15,11 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName",      "riccivr"
+            VALUE "CompanyName",      "Ricardo Veronese Ricci"
             VALUE "FileDescription",  "Universal Clipboard Daemon"
             VALUE "FileVersion",      "1.1.0.0"
             VALUE "InternalName",     "clipbridge"
-            VALUE "LegalCopyright",   "Copyright (C) 2026 riccivr. MIT License."
+            VALUE "LegalCopyright",   "Copyright (C) 2026 Ricardo Veronese Ricci. MIT License."
             VALUE "OriginalFilename", "clipbridge.exe"
             VALUE "ProductName",      "ClipBridge"
             VALUE "ProductVersion",   "1.1.0.0"
