@@ -4,107 +4,140 @@ import struct
 import io
 from PIL import Image, ImageDraw
 
-SRC_LOGO = "/mnt/c/Users/ricci/.gemini/antigravity/brain/30df34ec-5d4a-49e2-a886-a604571b4ba8/clipbridge_logo_1788099993501.jpg"
 ASSETS_DIR = "assets"
 os.makedirs(ASSETS_DIR, exist_ok=True)
 
-# 1. Color brand logo for README
-if os.path.exists(SRC_LOGO):
-    img = Image.open(SRC_LOGO).convert("RGBA")
-    img.save(os.path.join(ASSETS_DIR, "logo.png"), format="PNG", optimize=True)
-    img.resize((256, 256), Image.Resampling.LANCZOS).save(os.path.join(ASSETS_DIR, "clipbridge.png"), format="PNG")
-    print("Saved assets/logo.png & assets/clipbridge.png")
-
-# 2. Crisp Monochrome Vector SVG (macOS menu bar / Linux status / Windows tray)
-svg_monochrome = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Clipboard Board Outline -->
-  <path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2" />
-  <!-- Clipboard Clip Top -->
-  <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
-  <!-- Bridge Flow Lines (Rich -> Plain Text Conversion) -->
-  <path d="M4 11h4c2 0 3 2 5 2h7" />
-  <path d="M4 14h4c2 0 3-2 5-2h7" />
-  <!-- Clean Text Formatted Rows -->
-  <line x1="14" y1="17" x2="18" y2="17" />
-</svg>'''
-
-with open(os.path.join(ASSETS_DIR, "tray_icon.svg"), "w") as f:
-    f.write(svg_monochrome)
-with open(os.path.join(ASSETS_DIR, "clipbridge.svg"), "w") as f:
-    f.write(svg_monochrome)
-print("Saved assets/tray_icon.svg & assets/clipbridge.svg")
-
-# 3. Generate high-contrast monochrome tray icons for macOS / Linux / Windows
-def create_monochrome_icon(size):
+# 1. Color Master Icon Generator (Crisp vector on transparent background)
+def draw_app_icon(size):
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    
-    s = size / 24.0
-    sw = max(1, int(round(1.8 * s)))
-    
-    # Board outline
-    draw.rounded_rectangle([4*s, 4*s, 20*s, 22*s], radius=int(2*s), outline=(255, 255, 255, 255), width=sw)
-    # Clip cutout background
-    draw.rectangle([7*s, 3*s, 17*s, 6*s], fill=(0, 0, 0, 0))
-    # Clip top
-    draw.rounded_rectangle([7.5*s, 2*s, 16.5*s, 5.5*s], radius=int(1*s), fill=(255, 255, 255, 255))
-    
-    # Bridge flow waves
-    draw.line([(4*s, 11*s), (8*s, 11*s), (13*s, 13*s), (19*s, 13*s)], fill=(255, 255, 255, 255), width=sw)
-    draw.line([(4*s, 15*s), (8*s, 15*s), (13*s, 13*s), (19*s, 13*s)], fill=(255, 255, 255, 255), width=sw)
-    draw.line([(14*s, 17*s), (18*s, 17*s)], fill=(255, 255, 255, 255), width=sw)
+
+    s = size / 64.0  # reference coordinate system: 64x64
+
+    # High-contrast color palette
+    bg_fill = (15, 23, 42, 255)       # Dark slate
+    border_col = (0, 210, 255, 255)   # Electric cyan
+    clip_col = (255, 255, 255, 255)   # Bright white
+    line_cyan = (56, 189, 248, 255)   # Sky cyan
+    line_white = (248, 250, 252, 255) # Pure light
+
+    if size <= 24:
+        # Hand-tuned pixel-aligned design for 16x16 and 24x24
+        # Board
+        draw.rounded_rectangle([2*s, 3*s, 61*s, 61*s], radius=int(6*s), fill=bg_fill, outline=border_col, width=max(1, int(4*s)))
+        # Top Clip
+        draw.rounded_rectangle([18*s, 0*s, 46*s, 10*s], radius=int(3*s), fill=clip_col, outline=border_col, width=max(1, int(2*s)))
+        # Bridge lines
+        draw.line([(10*s, 22*s), (24*s, 22*s), (38*s, 30*s), (54*s, 30*s)], fill=line_cyan, width=max(1, int(5*s)))
+        draw.line([(10*s, 34*s), (24*s, 34*s), (38*s, 30*s), (54*s, 30*s)], fill=border_col, width=max(1, int(5*s)))
+        draw.line([(38*s, 42*s), (54*s, 42*s)], fill=line_white, width=max(1, int(5*s)))
+        draw.line([(10*s, 50*s), (54*s, 50*s)], fill=line_cyan, width=max(1, int(5*s)))
+    else:
+        # High-res design with crisp depth and clean geometry
+        # Board shadow / subtle outer ring
+        draw.rounded_rectangle([6*s, 7*s, 58*s, 61*s], radius=int(6*s), fill=(10, 15, 30, 255), outline=border_col, width=max(1, int(3.5*s)))
+        # Top Clip
+        draw.rounded_rectangle([20*s, 2*s, 44*s, 11*s], radius=int(3*s), fill=clip_col, outline=(0, 180, 230, 255), width=max(1, int(2*s)))
+        # Central hole in clip
+        draw.ellipse([29*s, 4*s, 35*s, 9*s], fill=bg_fill)
+
+        # Bridge Conversion Waves (Left: Raw -> Right: Clean formatted text)
+        # Flow 1
+        draw.line([(13*s, 22*s), (24*s, 22*s), (34*s, 28*s), (51*s, 28*s)], fill=border_col, width=max(1, int(3.5*s)))
+        # Flow 2
+        draw.line([(13*s, 32*s), (24*s, 32*s), (34*s, 28*s), (51*s, 28*s)], fill=line_cyan, width=max(1, int(3.5*s)))
+        # Formatted structured text rows
+        draw.line([(34*s, 38*s), (51*s, 38*s)], fill=line_white, width=max(1, int(3.5*s)))
+        draw.line([(13*s, 46*s), (51*s, 46*s)], fill=line_cyan, width=max(1, int(3.5*s)))
+        draw.line([(13*s, 53*s), (40*s, 53*s)], fill=line_white, width=max(1, int(3*s)))
 
     return img
 
-# Generate macOS template icons
-tray_16 = create_monochrome_icon(16)
-tray_32 = create_monochrome_icon(32)
+# 2. Generate multi-resolution ICO file for Windows (.ico)
+ico_sizes = [16, 20, 24, 32, 40, 48, 64, 128, 256]
+ico_images = [draw_app_icon(sz) for sz in ico_sizes]
+ico_images[0].save(
+    os.path.join(ASSETS_DIR, "icon.ico"),
+    format="ICO",
+    sizes=[(sz, sz) for sz in ico_sizes],
+    append_images=ico_images[1:]
+)
+print("Generated razor-sharp assets/icon.ico with 9 resolutions")
+
+# 3. High-Res PNGs for Linux / Web / Desktop
+logo_512 = draw_app_icon(512)
+logo_512.save(os.path.join(ASSETS_DIR, "logo.png"), format="PNG", optimize=True)
+logo_256 = draw_app_icon(256)
+logo_256.save(os.path.join(ASSETS_DIR, "clipbridge.png"), format="PNG", optimize=True)
+print("Generated assets/logo.png and assets/clipbridge.png")
+
+# 4. Monochrome Vector SVGs
+svg_content = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <rect x="8" y="9" width="48" height="51" rx="6" fill="#0F172A" stroke="#00D2FF" stroke-width="4"/>
+  <rect x="20" y="3" width="24" height="10" rx="3" fill="#FFFFFF" stroke="#00D2FF" stroke-width="2"/>
+  <circle cx="32" cy="7.5" r="2.5" fill="#0F172A"/>
+  <path d="M14 23h12c5 0 9 5 14 5h10" stroke="#00D2FF" stroke-width="4" stroke-linecap="round"/>
+  <path d="M14 33h12c5 0 9-5 14-5h10" stroke="#38BDF8" stroke-width="4" stroke-linecap="round"/>
+  <line x1="40" y1="38" x2="50" y2="38" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  <line x1="14" y1="46" x2="50" y2="46" stroke="#38BDF8" stroke-width="4" stroke-linecap="round"/>
+  <line x1="14" y1="53" x2="40" y2="53" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round"/>
+</svg>'''
+
+with open(os.path.join(ASSETS_DIR, "clipbridge.svg"), "w") as f:
+    f.write(svg_content)
+print("Generated assets/clipbridge.svg")
+
+# 5. Monochrome Tray Icons for macOS Menu Bar & Linux Status
+def draw_monochrome_tray_icon(size):
+    img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    s = size / 24.0
+    sw = max(1, int(round(1.6 * s)))
+
+    # Board outline
+    draw.rounded_rectangle([3.5*s, 3*s, 20.5*s, 22*s], radius=int(2*s), outline=(255, 255, 255, 255), width=sw)
+    # Clip cutout
+    draw.rectangle([7*s, 1.5*s, 17*s, 5.5*s], fill=(0, 0, 0, 0))
+    # Clip top
+    draw.rounded_rectangle([7.5*s, 1*s, 16.5*s, 5*s], radius=int(1.5*s), fill=(255, 255, 255, 255))
+    
+    # Bridge flow lines
+    draw.line([(5.5*s, 10.5*s), (9*s, 10.5*s), (13*s, 12.5*s), (18.5*s, 12.5*s)], fill=(255, 255, 255, 255), width=sw)
+    draw.line([(5.5*s, 14.5*s), (9*s, 14.5*s), (13*s, 12.5*s), (18.5*s, 12.5*s)], fill=(255, 255, 255, 255), width=sw)
+    draw.line([(13*s, 16.5*s), (18.5*s, 16.5*s)], fill=(255, 255, 255, 255), width=sw)
+    draw.line([(5.5*s, 19.5*s), (15*s, 19.5*s)], fill=(255, 255, 255, 255), width=sw)
+
+    return img
+
+tray_16 = draw_monochrome_tray_icon(16)
+tray_32 = draw_monochrome_tray_icon(32)
 tray_16.save(os.path.join(ASSETS_DIR, "tray_template.png"))
 tray_32.save(os.path.join(ASSETS_DIR, "tray_template@2x.png"))
-print("Saved assets/tray_template.png & @2x.png")
+print("Generated assets/tray_template.png & @2x.png")
 
-# Generate Windows multi-resolution icon (.ico)
-icon_sizes = [16, 24, 32, 48, 64, 128, 256]
-ico_images = []
-if os.path.exists(SRC_LOGO):
-    base_logo = Image.open(SRC_LOGO).convert("RGBA")
-    for sz in icon_sizes:
-        ico_images.append(base_logo.resize((sz, sz), Image.Resampling.LANCZOS))
-    
-    ico_images[0].save(
-        os.path.join(ASSETS_DIR, "icon.ico"),
-        format="ICO",
-        sizes=[(sz, sz) for sz in icon_sizes],
-        append_images=ico_images[1:]
-    )
-    print("Saved assets/icon.ico")
+# 6. macOS AppIcon.icns
+icns_entries = [
+    (b'icp4', 16),
+    (b'icp5', 32),
+    (b'icp6', 64),
+    (b'ic07', 128),
+    (b'ic08', 256),
+    (b'ic09', 512),
+    (b'ic10', 1024),
+]
+icns_body = bytearray()
+for ostype, sz in icns_entries:
+    icon_img = draw_app_icon(sz)
+    buf = io.BytesIO()
+    icon_img.save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+    entry_len = 8 + len(png_bytes)
+    icns_body.extend(ostype)
+    icns_body.extend(struct.pack('>I', entry_len))
+    icns_body.extend(png_bytes)
 
-# Generate macOS AppIcon.icns
-if os.path.exists(SRC_LOGO):
-    base_logo = Image.open(SRC_LOGO).convert("RGBA")
-    icns_entries = [
-        (b'icp4', 16),
-        (b'icp5', 32),
-        (b'icp6', 64),
-        (b'ic07', 128),
-        (b'ic08', 256),
-        (b'ic09', 512),
-        (b'ic10', 1024),
-    ]
-    icns_body = bytearray()
-    for ostype, sz in icns_entries:
-        resized = base_logo.resize((sz, sz), Image.Resampling.LANCZOS)
-        buf = io.BytesIO()
-        resized.save(buf, format="PNG")
-        png_bytes = buf.getvalue()
-        # Entry header: 4-byte OSType, 4-byte length (header + data)
-        entry_len = 8 + len(png_bytes)
-        icns_body.extend(ostype)
-        icns_body.extend(struct.pack('>I', entry_len))
-        icns_body.extend(png_bytes)
-    
-    total_len = 8 + len(icns_body)
-    icns_data = b'icns' + struct.pack('>I', total_len) + icns_body
-    with open(os.path.join(ASSETS_DIR, "AppIcon.icns"), "wb") as f:
-        f.write(icns_data)
-    print("Saved assets/AppIcon.icns")
+total_len = 8 + len(icns_body)
+icns_data = b'icns' + struct.pack('>I', total_len) + icns_body
+with open(os.path.join(ASSETS_DIR, "AppIcon.icns"), "wb") as f:
+    f.write(icns_data)
+print("Generated assets/AppIcon.icns")

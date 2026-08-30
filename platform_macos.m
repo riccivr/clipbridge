@@ -10,6 +10,7 @@
 #include <signal.h>
 #include "clipbridge.h"
 #include "unipaste.h"
+#include "i18n.h"
 
 static struct config current_cfg;
 static BOOL auto_format_default = NO;
@@ -233,11 +234,13 @@ create_status_bar_template_icon(void)
 	(void)notification;
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
 
+	i18n_init(LANG_AUTO);
+
 	self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
 	NSStatusBarButton *button = self.statusItem.button;
 	if (button) {
 		button.image = create_status_bar_template_icon();
-		button.toolTip = @"ClipBridge (Press Cmd+Alt+V to paste)";
+		button.toolTip = [NSString stringWithUTF8String:i18n_get(STR_TOOLTIP_ACTIVE)];
 	}
 
 	[self buildMenu];
@@ -250,7 +253,8 @@ create_status_bar_template_icon(void)
 	NSMenu *menu = [[NSMenu alloc] initWithTitle:@"ClipBridge"];
 
 	/* Paste with ClipBridge */
-	NSMenuItem *pasteItem = [[NSMenuItem alloc] initWithTitle:@"Paste with ClipBridge" action:@selector(actionPasteActive:) keyEquivalent:@"v"];
+	NSString *pasteTitle = [NSString stringWithUTF8String:i18n_get(STR_PASTE_ACTIVE)];
+	NSMenuItem *pasteItem = [[NSMenuItem alloc] initWithTitle:pasteTitle action:@selector(actionPasteActive:) keyEquivalent:@"v"];
 	[pasteItem setKeyEquivalentModifierMask:(NSEventModifierFlagCommand | NSEventModifierFlagOption)];
 	[pasteItem setTarget:self];
 	[menu addItem:pasteItem];
@@ -258,7 +262,8 @@ create_status_bar_template_icon(void)
 	[menu addItem:[NSMenuItem separatorItem]];
 
 	/* Auto-format default paste */
-	self.autoFormatItem = [[NSMenuItem alloc] initWithTitle:@"Auto-Format Default Paste (Cmd+V)" action:@selector(toggleAutoFormat:) keyEquivalent:@""];
+	NSString *autoTitle = [NSString stringWithUTF8String:i18n_get(STR_AUTO_FORMAT)];
+	self.autoFormatItem = [[NSMenuItem alloc] initWithTitle:autoTitle action:@selector(toggleAutoFormat:) keyEquivalent:@""];
 	[self.autoFormatItem setTarget:self];
 	[self.autoFormatItem setState:(auto_format_default ? NSControlStateValueOn : NSControlStateValueOff)];
 	[menu addItem:self.autoFormatItem];
@@ -266,20 +271,21 @@ create_status_bar_template_icon(void)
 	[menu addItem:[NSMenuItem separatorItem]];
 
 	/* Mode Submenu */
-	NSMenuItem *modeParent = [[NSMenuItem alloc] initWithTitle:@"Output Mode" action:nil keyEquivalent:@""];
-	NSMenu *modeMenu = [[NSMenu alloc] initWithTitle:@"Output Mode"];
+	NSString *modeTitle = [NSString stringWithUTF8String:i18n_get(STR_OUTPUT_MODE)];
+	NSMenuItem *modeParent = [[NSMenuItem alloc] initWithTitle:modeTitle action:nil keyEquivalent:@""];
+	NSMenu *modeMenu = [[NSMenu alloc] initWithTitle:modeTitle];
 	
-	NSMenuItem *mPlain = [[NSMenuItem alloc] initWithTitle:@"Plain Text (TextEdit / Terminal)" action:@selector(setModePlain:) keyEquivalent:@""];
+	NSMenuItem *mPlain = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_MODE_PLAIN)] action:@selector(setModePlain:) keyEquivalent:@""];
 	[mPlain setTarget:self];
 	[mPlain setState:(current_cfg.mode == MODE_PLAIN ? NSControlStateValueOn : NSControlStateValueOff)];
 	[modeMenu addItem:mPlain];
 
-	NSMenuItem *mMarkdown = [[NSMenuItem alloc] initWithTitle:@"GitHub-Flavored Markdown" action:@selector(setModeMarkdown:) keyEquivalent:@""];
+	NSMenuItem *mMarkdown = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_MODE_MARKDOWN)] action:@selector(setModeMarkdown:) keyEquivalent:@""];
 	[mMarkdown setTarget:self];
 	[mMarkdown setState:(current_cfg.mode == MODE_MARKDOWN ? NSControlStateValueOn : NSControlStateValueOff)];
 	[modeMenu addItem:mMarkdown];
 
-	NSMenuItem *mTerminal = [[NSMenuItem alloc] initWithTitle:@"Terminal ANSI" action:@selector(setModeTerminal:) keyEquivalent:@""];
+	NSMenuItem *mTerminal = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_MODE_TERMINAL)] action:@selector(setModeTerminal:) keyEquivalent:@""];
 	[mTerminal setTarget:self];
 	[mTerminal setState:(current_cfg.mode == MODE_TERMINAL ? NSControlStateValueOn : NSControlStateValueOff)];
 	[modeMenu addItem:mTerminal];
@@ -288,25 +294,26 @@ create_status_bar_template_icon(void)
 	[menu addItem:modeParent];
 
 	/* Table Submenu */
-	NSMenuItem *tableParent = [[NSMenuItem alloc] initWithTitle:@"Table Style" action:nil keyEquivalent:@""];
-	NSMenu *tableMenu = [[NSMenu alloc] initWithTitle:@"Table Style"];
+	NSString *tableTitle = [NSString stringWithUTF8String:i18n_get(STR_TABLE_STYLE)];
+	NSMenuItem *tableParent = [[NSMenuItem alloc] initWithTitle:tableTitle action:nil keyEquivalent:@""];
+	NSMenu *tableMenu = [[NSMenu alloc] initWithTitle:tableTitle];
 
-	NSMenuItem *tGrid = [[NSMenuItem alloc] initWithTitle:@"ASCII Box (+---+)" action:@selector(setTableGrid:) keyEquivalent:@""];
+	NSMenuItem *tGrid = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_TABLE_GRID)] action:@selector(setTableGrid:) keyEquivalent:@""];
 	[tGrid setTarget:self];
 	[tGrid setState:(current_cfg.table_style == TABLE_STYLE_GRID && !current_cfg.unicode_tables ? NSControlStateValueOn : NSControlStateValueOff)];
 	[tableMenu addItem:tGrid];
 
-	NSMenuItem *tUnicode = [[NSMenuItem alloc] initWithTitle:@"Unicode Grid (┌───┐)" action:@selector(setTableUnicode:) keyEquivalent:@""];
+	NSMenuItem *tUnicode = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_TABLE_UNICODE)] action:@selector(setTableUnicode:) keyEquivalent:@""];
 	[tUnicode setTarget:self];
 	[tUnicode setState:(current_cfg.unicode_tables ? NSControlStateValueOn : NSControlStateValueOff)];
 	[tableMenu addItem:tUnicode];
 
-	NSMenuItem *tMd = [[NSMenuItem alloc] initWithTitle:@"Markdown Pipe Table" action:@selector(setTableMarkdown:) keyEquivalent:@""];
+	NSMenuItem *tMd = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_TABLE_MARKDOWN)] action:@selector(setTableMarkdown:) keyEquivalent:@""];
 	[tMd setTarget:self];
 	[tMd setState:(current_cfg.table_style == TABLE_STYLE_MARKDOWN ? NSControlStateValueOn : NSControlStateValueOff)];
 	[tableMenu addItem:tMd];
 
-	NSMenuItem *tTsv = [[NSMenuItem alloc] initWithTitle:@"Tab-Separated (TSV)" action:@selector(setTableTsv:) keyEquivalent:@""];
+	NSMenuItem *tTsv = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_TABLE_TSV)] action:@selector(setTableTsv:) keyEquivalent:@""];
 	[tTsv setTarget:self];
 	[tTsv setState:(current_cfg.table_style == TABLE_STYLE_TSV ? NSControlStateValueOn : NSControlStateValueOff)];
 	[tableMenu addItem:tTsv];
@@ -314,23 +321,49 @@ create_status_bar_template_icon(void)
 	[tableParent setSubmenu:tableMenu];
 	[menu addItem:tableParent];
 
+	/* Language Submenu */
+	NSString *langTitle = [NSString stringWithUTF8String:i18n_get(STR_LANGUAGE)];
+	NSMenuItem *langParent = [[NSMenuItem alloc] initWithTitle:langTitle action:nil keyEquivalent:@""];
+	NSMenu *langMenu = [[NSMenu alloc] initWithTitle:langTitle];
+
+	NSMenuItem *lAuto = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_LANG_AUTO)] action:@selector(setLangAuto:) keyEquivalent:@""];
+	[lAuto setTarget:self];
+	[lAuto setState:(i18n_get_language() == LANG_AUTO ? NSControlStateValueOn : NSControlStateValueOff)];
+	[langMenu addItem:lAuto];
+
+	NSMenuItem *lEn = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_LANG_EN)] action:@selector(setLangEn:) keyEquivalent:@""];
+	[lEn setTarget:self];
+	[lEn setState:(i18n_get_language() == LANG_EN ? NSControlStateValueOn : NSControlStateValueOff)];
+	[langMenu addItem:lEn];
+
+	NSMenuItem *lEs = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_LANG_ES)] action:@selector(setLangEs:) keyEquivalent:@""];
+	[lEs setTarget:self];
+	[lEs setState:(i18n_get_language() == LANG_ES ? NSControlStateValueOn : NSControlStateValueOff)];
+	[langMenu addItem:lEs];
+
+	[langParent setSubmenu:langMenu];
+	[menu addItem:langParent];
+
 	[menu addItem:[NSMenuItem separatorItem]];
 
 	/* Start with macOS Login */
-	self.startupItem = [[NSMenuItem alloc] initWithTitle:@"Start with macOS Login" action:@selector(toggleStartup:) keyEquivalent:@""];
+	NSString *startTitle = [NSString stringWithUTF8String:i18n_get(STR_STARTUP)];
+	self.startupItem = [[NSMenuItem alloc] initWithTitle:startTitle action:@selector(toggleStartup:) keyEquivalent:@""];
 	[self.startupItem setTarget:self];
 	[self.startupItem setState:(is_launch_agent_enabled() ? NSControlStateValueOn : NSControlStateValueOff)];
 	[menu addItem:self.startupItem];
 
 	/* About ClipBridge */
-	NSMenuItem *aboutItem = [[NSMenuItem alloc] initWithTitle:@"About ClipBridge..." action:@selector(showAbout:) keyEquivalent:@""];
+	NSString *aboutTitle = [NSString stringWithUTF8String:i18n_get(STR_ABOUT_MENU)];
+	NSMenuItem *aboutItem = [[NSMenuItem alloc] initWithTitle:aboutTitle action:@selector(showAbout:) keyEquivalent:@""];
 	[aboutItem setTarget:self];
 	[menu addItem:aboutItem];
 
 	[menu addItem:[NSMenuItem separatorItem]];
 
 	/* Quit */
-	NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:@"Quit ClipBridge" action:@selector(quitApp:) keyEquivalent:@"q"];
+	NSString *quitTitle = [NSString stringWithUTF8String:i18n_get(STR_EXIT)];
+	NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:quitTitle action:@selector(quitApp:) keyEquivalent:@"q"];
 	[quitItem setTarget:self];
 	[menu addItem:quitItem];
 
@@ -377,6 +410,10 @@ create_status_bar_template_icon(void)
 - (void)setTableMarkdown:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_MARKDOWN; [self buildMenu]; }
 - (void)setTableTsv:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_TSV; [self buildMenu]; }
 
+- (void)setLangAuto:(id)sender { (void)sender; i18n_set_language(LANG_AUTO); [self buildMenu]; }
+- (void)setLangEn:(id)sender { (void)sender; i18n_set_language(LANG_EN); [self buildMenu]; }
+- (void)setLangEs:(id)sender { (void)sender; i18n_set_language(LANG_ES); [self buildMenu]; }
+
 - (void)toggleStartup:(id)sender {
 	(void)sender;
 	set_launch_agent_enabled(!is_launch_agent_enabled());
@@ -386,13 +423,8 @@ create_status_bar_template_icon(void)
 - (void)showAbout:(id)sender {
 	(void)sender;
 	NSAlert *alert = [[NSAlert alloc] init];
-	[alert setMessageText:@"ClipBridge - Universal Clipboard Daemon"];
-	[alert setInformativeText:[NSString stringWithFormat:
-		@"Version: %s\n\n"
-		@"Author: Ricardo Veronese Ricci\n"
-		@"GitHub: https://github.com/riccivr/clipbridge\n\n"
-		@"A lightweight clipboard formatting bridge powered by unipaste.\n"
-		@"License: MIT License", VERSION]];
+	[alert setMessageText:[NSString stringWithUTF8String:i18n_get(STR_ABOUT_TITLE)]];
+	[alert setInformativeText:[NSString stringWithUTF8String:i18n_get(STR_ABOUT_BODY)]];
 	[alert setAlertStyle:NSAlertStyleInformational];
 	[alert addButtonWithTitle:@"OK"];
 	[alert runModal];

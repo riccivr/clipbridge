@@ -8,6 +8,7 @@
 #include <string.h>
 #include "clipbridge.h"
 #include "unipaste.h"
+#include "i18n.h"
 
 #define WM_TRAYICON (WM_USER + 1)
 #define ID_TRAY_PASTE_NOW        1001
@@ -19,9 +20,12 @@
 #define ID_TRAY_TABLE_UNICODE    1007
 #define ID_TRAY_TABLE_MARKDOWN   1008
 #define ID_TRAY_TABLE_TSV        1009
-#define ID_TRAY_STARTUP          1010
-#define ID_TRAY_ABOUT            1011
-#define ID_TRAY_EXIT             1012
+#define ID_TRAY_LANG_AUTO        1010
+#define ID_TRAY_LANG_EN          1011
+#define ID_TRAY_LANG_ES          1012
+#define ID_TRAY_STARTUP          1013
+#define ID_TRAY_ABOUT            1014
+#define ID_TRAY_EXIT             1015
 
 #define ID_HOTKEY_CTRL_ALT_V     2001
 #define ID_HOTKEY_WIN_ALT_V      2002
@@ -278,11 +282,7 @@ set_startup_enabled(int enable)
 static void
 update_tray_tooltip(void)
 {
-	if (auto_format_default) {
-		snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Auto-format Ctrl+V enabled)");
-	} else {
-		snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Press Ctrl+Alt+V to paste)");
-	}
+	snprintf(nid.szTip, sizeof(nid.szTip), "%s", i18n_get(auto_format_default ? STR_TOOLTIP_AUTO : STR_TOOLTIP_ACTIVE));
 	Shell_NotifyIconA(NIM_MODIFY, &nid);
 }
 
@@ -293,40 +293,48 @@ show_tray_menu(HWND hwnd)
 	HMENU hMenu = CreatePopupMenu();
 	HMENU hModeMenu = CreatePopupMenu();
 	HMENU hTableMenu = CreatePopupMenu();
+	HMENU hLangMenu = CreatePopupMenu();
 
 	GetCursorPos(&pt);
 
 	/* Instant Paste Action */
-	AppendMenuA(hMenu, MF_STRING, ID_TRAY_PASTE_NOW, "Paste with ClipBridge\tCtrl+Alt+V");
+	AppendMenuA(hMenu, MF_STRING, ID_TRAY_PASTE_NOW, i18n_get(STR_PASTE_ACTIVE));
 	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
 
-	/* Auto-format default toggle (Off by default, user can turn on) */
-	AppendMenuA(hMenu, (auto_format_default ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_AUTO_FORMAT, "Auto-Format Default Paste (Ctrl+V)");
+	/* Auto-format default toggle */
+	AppendMenuA(hMenu, (auto_format_default ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_AUTO_FORMAT, i18n_get(STR_AUTO_FORMAT));
 	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
 
 	/* Mode submenu */
-	AppendMenuA(hModeMenu, (current_cfg.mode == MODE_PLAIN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_PLAIN, "Plain Text (Notepad)");
-	AppendMenuA(hModeMenu, (current_cfg.mode == MODE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_MARKDOWN, "GitHub-Flavored Markdown");
-	AppendMenuA(hModeMenu, (current_cfg.mode == MODE_TERMINAL ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_TERMINAL, "Terminal ANSI");
-	AppendMenuA(hMenu, MF_POPUP, (UINT_PTR)hModeMenu, "Output Mode");
+	AppendMenuA(hModeMenu, (current_cfg.mode == MODE_PLAIN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_PLAIN, i18n_get(STR_MODE_PLAIN));
+	AppendMenuA(hModeMenu, (current_cfg.mode == MODE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_MARKDOWN, i18n_get(STR_MODE_MARKDOWN));
+	AppendMenuA(hModeMenu, (current_cfg.mode == MODE_TERMINAL ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_TERMINAL, i18n_get(STR_MODE_TERMINAL));
+	AppendMenuA(hMenu, MF_POPUP, (UINT_PTR)hModeMenu, i18n_get(STR_OUTPUT_MODE));
 
 	/* Table submenu */
-	AppendMenuA(hTableMenu, (current_cfg.table_style == TABLE_STYLE_GRID && !current_cfg.unicode_tables ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_GRID, "ASCII Box (+---+)");
-	AppendMenuA(hTableMenu, (current_cfg.unicode_tables ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_UNICODE, "Unicode Grid (┌───┐)");
-	AppendMenuA(hTableMenu, (current_cfg.table_style == TABLE_STYLE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_MARKDOWN, "Markdown Pipe Table");
-	AppendMenuA(hTableMenu, (current_cfg.table_style == TABLE_STYLE_TSV ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_TSV, "Tab-Separated (TSV)");
-	AppendMenuA(hMenu, MF_POPUP, (UINT_PTR)hTableMenu, "Table Style");
+	AppendMenuA(hTableMenu, (current_cfg.table_style == TABLE_STYLE_GRID && !current_cfg.unicode_tables ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_GRID, i18n_get(STR_TABLE_GRID));
+	AppendMenuA(hTableMenu, (current_cfg.unicode_tables ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_UNICODE, i18n_get(STR_TABLE_UNICODE));
+	AppendMenuA(hTableMenu, (current_cfg.table_style == TABLE_STYLE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_MARKDOWN, i18n_get(STR_TABLE_MARKDOWN));
+	AppendMenuA(hTableMenu, (current_cfg.table_style == TABLE_STYLE_TSV ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_TSV, i18n_get(STR_TABLE_TSV));
+	AppendMenuA(hMenu, MF_POPUP, (UINT_PTR)hTableMenu, i18n_get(STR_TABLE_STYLE));
+
+	/* Language submenu */
+	AppendMenuA(hLangMenu, (i18n_get_language() == LANG_AUTO ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_LANG_AUTO, i18n_get(STR_LANG_AUTO));
+	AppendMenuA(hLangMenu, (i18n_get_language() == LANG_EN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_LANG_EN, i18n_get(STR_LANG_EN));
+	AppendMenuA(hLangMenu, (i18n_get_language() == LANG_ES ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_LANG_ES, i18n_get(STR_LANG_ES));
+	AppendMenuA(hMenu, MF_POPUP, (UINT_PTR)hLangMenu, i18n_get(STR_LANGUAGE));
 
 	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
-	AppendMenuA(hMenu, (is_startup_enabled() ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_STARTUP, "Start with Windows");
-	AppendMenuA(hMenu, MF_STRING, ID_TRAY_ABOUT, "About ClipBridge...");
+	AppendMenuA(hMenu, (is_startup_enabled() ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_STARTUP, i18n_get(STR_STARTUP));
+	AppendMenuA(hMenu, MF_STRING, ID_TRAY_ABOUT, i18n_get(STR_ABOUT_MENU));
 	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
-	AppendMenuA(hMenu, MF_STRING, ID_TRAY_EXIT, "Exit ClipBridge");
+	AppendMenuA(hMenu, MF_STRING, ID_TRAY_EXIT, i18n_get(STR_EXIT));
 
 	SetForegroundWindow(hwnd);
 	TrackPopupMenu(hMenu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN, pt.x, pt.y, 0, hwnd, NULL);
 	PostMessage(hwnd, WM_NULL, 0, 0);
 
+	DestroyMenu(hLangMenu);
 	DestroyMenu(hTableMenu);
 	DestroyMenu(hModeMenu);
 	DestroyMenu(hMenu);
@@ -406,18 +414,25 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case ID_TRAY_TABLE_TSV:
 			current_cfg.table_style = TABLE_STYLE_TSV;
 			break;
+		case ID_TRAY_LANG_AUTO:
+			i18n_set_language(LANG_AUTO);
+			update_tray_tooltip();
+			break;
+		case ID_TRAY_LANG_EN:
+			i18n_set_language(LANG_EN);
+			update_tray_tooltip();
+			break;
+		case ID_TRAY_LANG_ES:
+			i18n_set_language(LANG_ES);
+			update_tray_tooltip();
+			break;
 		case ID_TRAY_STARTUP:
 			set_startup_enabled(!is_startup_enabled());
 			break;
 		case ID_TRAY_ABOUT:
 			MessageBoxA(hwnd,
-				"ClipBridge - Universal Clipboard Daemon\n"
-				"Version: " VERSION "\n\n"
-				"Author: Ricardo Veronese Ricci\n"
-				"GitHub: https://github.com/riccivr/clipbridge\n\n"
-				"A lightweight clipboard formatting bridge powered by unipaste.\n"
-				"License: MIT License",
-				"About ClipBridge",
+				i18n_get(STR_ABOUT_BODY),
+				i18n_get(STR_ABOUT_TITLE),
 				MB_OK | MB_ICONINFORMATION);
 			break;
 		case ID_TRAY_EXIT:
@@ -451,6 +466,9 @@ clipboard_watch(const struct config *cfg)
 		current_cfg.mode = MODE_PLAIN;
 	}
 	current_cfg.crlf = 1;
+
+	/* Initialize i18n subsystem */
+	i18n_init(LANG_AUTO);
 
 	/* Singleton Enforcement: Allow only 1 running daemon instance */
 	HANDLE hMutex = CreateMutexA(NULL, TRUE, "Local\\ClipBridge_SingleInstance_Mutex_Ricci");
@@ -496,7 +514,7 @@ clipboard_watch(const struct config *cfg)
 	nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1));
 	if (!nid.hIcon)
 		nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Press Ctrl+Alt+V to paste)");
+	snprintf(nid.szTip, sizeof(nid.szTip), "%s", i18n_get(STR_TOOLTIP_ACTIVE));
 
 	Shell_NotifyIconA(NIM_ADD, &nid);
 

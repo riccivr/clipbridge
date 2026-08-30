@@ -1,0 +1,48 @@
+/* See LICENSE file for copyright and license details. */
+#ifndef I18N_H
+#define I18N_H
+
+enum lang_id {
+	LANG_AUTO = 0,
+	LANG_EN,
+	LANG_ES
+};
+
+enum str_id {
+	STR_APP_NAME = 0,
+	STR_APP_DESC,
+	STR_PASTE_ACTIVE,
+	STR_AUTO_FORMAT,
+	STR_OUTPUT_MODE,
+	STR_MODE_PLAIN,
+	STR_MODE_MARKDOWN,
+	STR_MODE_TERMINAL,
+	STR_TABLE_STYLE,
+	STR_TABLE_GRID,
+	STR_TABLE_UNICODE,
+	STR_TABLE_MARKDOWN,
+	STR_TABLE_TSV,
+	STR_LANGUAGE,
+	STR_LANG_AUTO,
+	STR_LANG_EN,
+	STR_LANG_ES,
+	STR_STARTUP,
+	STR_ABOUT_TITLE,
+	STR_ABOUT_MENU,
+	STR_ABOUT_BODY,
+	STR_EXIT,
+	STR_TOOLTIP_ACTIVE,
+	STR_TOOLTIP_AUTO,
+	STR_INSTALL_WELCOME_TITLE,
+	STR_INSTALL_WELCOME_MSG,
+	STR_INSTALL_SUCCESS_TITLE,
+	STR_INSTALL_SUCCESS_MSG,
+	STR_COUNT
+};
+
+void i18n_init(enum lang_id lang);
+void i18n_set_language(enum lang_id lang);
+enum lang_id i18n_get_language(void);
+const char *i18n_get(enum str_id id);
+
+#endif /* I18N_H */

@@ -23,8 +23,8 @@ PLATFORM_SRC = platform_posix.c platform_win32.c
 PLATFORM_OBJ = platform_posix.o platform_win32.o
 endif
 
-SRC = clipbridge.c $(PLATFORM_SRC)
-OBJ = clipbridge.o $(PLATFORM_OBJ) $(UNIPASTE_OBJ)
+SRC = clipbridge.c i18n.c $(PLATFORM_SRC)
+OBJ = clipbridge.o i18n.o $(PLATFORM_OBJ) $(UNIPASTE_OBJ)
 
 all: clipbridge
 
@@ -57,7 +57,7 @@ clean:
 
 dist: clean
 	mkdir -p clipbridge-$(VERSION)/scripts clipbridge-$(VERSION)/packaging clipbridge-$(VERSION)/assets
-	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.rc installer.rc clipbridge.1 arg.h clipbridge.h clipbridge.c installer_win32.c platform_posix.c platform_win32.c platform_macos.m scripts packaging assets clipbridge-$(VERSION)
+	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.rc installer.rc clipbridge.1 arg.h clipbridge.h i18n.h clipbridge.c i18n.c installer_win32.c platform_posix.c platform_win32.c platform_macos.m scripts packaging assets clipbridge-$(VERSION)
 	tar -cf clipbridge-$(VERSION).tar clipbridge-$(VERSION)
 	gzip clipbridge-$(VERSION).tar
 	rm -rf clipbridge-$(VERSION)
@@ -82,10 +82,10 @@ CC_WIN32 ?= x86_64-w64-mingw32-gcc
 WINDRES  ?= x86_64-w64-mingw32-windres
 exe:
 	$(WINDRES) clipbridge.rc -O coff -o clipbridge_res.o
-	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows clipbridge.c platform_win32.c clipbridge_res.o $(UNIPASTE_SRC) -o clipbridge.exe -s -luser32 -lshell32 -ladvapi32
+	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows clipbridge.c platform_win32.c i18n.c clipbridge_res.o $(UNIPASTE_SRC) -o clipbridge.exe -s -luser32 -lshell32 -ladvapi32
 	cp clipbridge.exe clipbridge-portable.exe
 	$(WINDRES) installer.rc -O coff -o installer_res.o
-	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows installer_win32.c installer_res.o -o clipbridge-setup.exe -s -luser32 -lshell32 -ladvapi32 -lole32 -luuid
+	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows installer_win32.c i18n.c installer_res.o -o clipbridge-setup.exe -s -luser32 -lshell32 -ladvapi32 -lole32 -luuid
 	@echo "Built clipbridge.exe, clipbridge-portable.exe, and clipbridge-setup.exe"
 
 dmg: all

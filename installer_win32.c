@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "i18n.h"
 
 #define VERSION "1.1.0"
 
@@ -59,12 +60,12 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 	FILE *fp;
 	HKEY hKey;
 
+	i18n_init(LANG_AUTO);
+
 	/* 1. Prompt user to confirm installation */
 	int choice = MessageBoxA(NULL,
-		"Welcome to ClipBridge Setup!\n\n"
-		"This will install ClipBridge on your computer and create a Start Menu launcher.\n\n"
-		"Do you want to continue?",
-		"ClipBridge Setup",
+		i18n_get(STR_INSTALL_WELCOME_MSG),
+		i18n_get(STR_INSTALL_WELCOME_TITLE),
 		MB_YESNO | MB_ICONQUESTION);
 
 	if (choice != IDYES)
@@ -106,7 +107,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 	/* 4. Create Start Menu Shortcut */
 	if (SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROGRAMS, NULL, 0, startMenuDir))) {
 		snprintf(shortcutPath, sizeof(shortcutPath), "%s\\ClipBridge.lnk", startMenuDir);
-		create_shortcut(destExe, shortcutPath, "Universal Clipboard Daemon (powered by unipaste)", destExe);
+		create_shortcut(destExe, shortcutPath, i18n_get(STR_APP_DESC), destExe);
 	}
 
 	/* 5. Register in Windows Uninstall Programs registry */
@@ -114,7 +115,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 		const char *name = "ClipBridge";
 		const char *version = VERSION;
 		const char *publisher = "Ricardo Veronese Ricci";
-		char uninstCmd[MAX_PATH + 32];
+		char uninstCmd[MAX_PATH * 2];
 		snprintf(uninstCmd, sizeof(uninstCmd), "\"%s\" --uninstall", destExe);
 
 		RegSetValueExA(hKey, "DisplayName", 0, REG_SZ, (const BYTE *)name, (DWORD)strlen(name) + 1);
@@ -131,11 +132,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 
 	/* 7. Success message */
 	MessageBoxA(NULL,
-		"ClipBridge has been installed successfully!\n\n"
-		"• You can now launch ClipBridge anytime from your Windows Start Menu.\n"
-		"• ClipBridge is now active in your System Tray.\n"
-		"• Press Ctrl+Alt+V anywhere to paste clean formatted text.",
-		"ClipBridge Setup Complete",
+		i18n_get(STR_INSTALL_SUCCESS_MSG),
+		i18n_get(STR_INSTALL_SUCCESS_TITLE),
 		MB_OK | MB_ICONINFORMATION);
 
 	return 0;
