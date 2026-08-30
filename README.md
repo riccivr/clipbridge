@@ -1,8 +1,9 @@
 <p align="center">
-  <img src="assets/logo.png" alt="ClipBridge Logo" width="140" height="140" />
+  <img src="assets/logo.png" alt="ClipBridge Logo" width="220" />
 </p>
 
-# clipbridge
+<h1 align="center">ClipBridge</h1>
+<p align="center"><strong>Universal Clipboard Formatting Bridge &amp; Background Daemon</strong></p>
 
 `clipbridge` runs as a background daemon or one-shot command that formats clipboard HTML using the [`unipaste`](https://github.com/riccivr/unipaste) engine.
 
