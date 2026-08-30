@@ -234,7 +234,33 @@ create_status_bar_template_icon(void)
 	(void)notification;
 	[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
 
-	i18n_init(LANG_AUTO);
+	NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+	if (![defaults boolForKey:@"HasCompletedOnboarding"]) {
+		NSAlert *alert = [[NSAlert alloc] init];
+		[alert setMessageText:@"ClipBridge Setup / Configuración"];
+		[alert setInformativeText:@"Welcome to ClipBridge!\nPlease choose your preferred language:\n\n¡Bienvenido a ClipBridge!\nPor favor elija su idioma preferido:"];
+		[alert setAlertStyle:NSAlertStyleInformational];
+		[alert addButtonWithTitle:@"English"];
+		[alert addButtonWithTitle:@"Español"];
+		NSModalResponse resp = [alert runModal];
+		if (resp == NSAlertSecondButtonReturn) {
+			i18n_set_language(LANG_ES);
+			[defaults setObject:@"es" forKey:@"Language"];
+		} else {
+			i18n_set_language(LANG_EN);
+			[defaults setObject:@"en" forKey:@"Language"];
+		}
+		[defaults setBool:YES forKey:@"HasCompletedOnboarding"];
+	} else {
+		NSString *savedLang = [defaults stringForKey:@"Language"];
+		if ([savedLang isEqualToString:@"es"]) {
+			i18n_set_language(LANG_ES);
+		} else if ([savedLang isEqualToString:@"en"]) {
+			i18n_set_language(LANG_EN);
+		} else {
+			i18n_init(LANG_AUTO);
+		}
+	}
 
 	self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
 	NSStatusBarButton *button = self.statusItem.button;
@@ -410,9 +436,26 @@ create_status_bar_template_icon(void)
 - (void)setTableMarkdown:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_MARKDOWN; [self buildMenu]; }
 - (void)setTableTsv:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_TSV; [self buildMenu]; }
 
-- (void)setLangAuto:(id)sender { (void)sender; i18n_set_language(LANG_AUTO); [self buildMenu]; }
-- (void)setLangEn:(id)sender { (void)sender; i18n_set_language(LANG_EN); [self buildMenu]; }
-- (void)setLangEs:(id)sender { (void)sender; i18n_set_language(LANG_ES); [self buildMenu]; }
+- (void)setLangAuto:(id)sender {
+	(void)sender;
+	i18n_set_language(LANG_AUTO);
+	[[NSUserDefaults standardUserDefaults] removeObjectForKey:@"Language"];
+	[self buildMenu];
+}
+
+- (void)setLangEn:(id)sender {
+	(void)sender;
+	i18n_set_language(LANG_EN);
+	[[NSUserDefaults standardUserDefaults] setObject:@"en" forKey:@"Language"];
+	[self buildMenu];
+}
+
+- (void)setLangEs:(id)sender {
+	(void)sender;
+	i18n_set_language(LANG_ES);
+	[[NSUserDefaults standardUserDefaults] setObject:@"es" forKey:@"Language"];
+	[self buildMenu];
+}
 
 - (void)toggleStartup:(id)sender {
 	(void)sender;

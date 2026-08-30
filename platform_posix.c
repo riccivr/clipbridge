@@ -10,6 +10,7 @@
 #include <sys/file.h>
 #include "clipbridge.h"
 #include "unipaste.h"
+#include "i18n.h"
 
 static volatile sig_atomic_t running = 1;
 
@@ -181,7 +182,9 @@ clipboard_watch(const struct config *cfg)
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
 
-	printf("clipbridge: monitoring Linux/BSD clipboard (press Ctrl+C to stop)...\n");
+	i18n_init(LANG_AUTO);
+
+	printf("clipbridge: %s\n", i18n_get(STR_TOOLTIP_ACTIVE));
 	fflush(stdout);
 
 	while (running) {
