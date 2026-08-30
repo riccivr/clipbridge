@@ -452,6 +452,18 @@ clipboard_watch(const struct config *cfg)
 	}
 	current_cfg.crlf = 1;
 
+	/* Singleton Enforcement: Allow only 1 running daemon instance */
+	HANDLE hMutex = CreateMutexA(NULL, TRUE, "Local\\ClipBridge_SingleInstance_Mutex_Ricci");
+	if (GetLastError() == ERROR_ALREADY_EXISTS) {
+		HWND existing = FindWindowA("ClipBridgeMonitorClass", "ClipBridge");
+		if (existing) {
+			PostMessageA(existing, WM_COMMAND, ID_TRAY_ABOUT, 0);
+		}
+		if (hMutex)
+			CloseHandle(hMutex);
+		return 0;
+	}
+
 	init_win32_clipboard();
 
 	memset(&wc, 0, sizeof(wc));

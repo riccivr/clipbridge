@@ -1,12 +1,8 @@
 param (
-    [string]$FilePath = "clipbridge.exe"
+    [string[]]$FilePaths = @("clipbridge.exe", "clipbridge-portable.exe", "clipbridge-setup.exe")
 )
 
 $ErrorActionPreference = 'Stop'
-
-if (-not (Test-Path $FilePath)) {
-    Write-Error "File not found: $FilePath"
-}
 
 # Find existing riccivr code-signing cert or create one
 $cert = Get-ChildItem -Path Cert:\CurrentUser\My -CodeSigningCert | Where-Object { $_.Subject -match "CN=riccivr" } | Select-Object -First 1
@@ -27,8 +23,10 @@ if (-not $cert) {
     $rootStore.Close()
 }
 
-Write-Host "Signing $FilePath as Publisher: riccivr..."
-$sig = Set-AuthenticodeSignature -FilePath $FilePath -Certificate $cert -HashAlgorithm SHA256
-
-Write-Host "Signature Status: $($sig.Status)"
-Write-Host "Signer: $($sig.SignerCertificate.Subject)"
+foreach ($fp in $FilePaths) {
+    if (Test-Path $fp) {
+        Write-Host "Signing $fp as Publisher: Ricardo Veronese Ricci..."
+        $sig = Set-AuthenticodeSignature -FilePath $fp -Certificate $cert -HashAlgorithm SHA256
+        Write-Host "Signed $fp (Status: $($sig.Status))"
+    }
+}

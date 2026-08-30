@@ -74,12 +74,13 @@ choco install clipbridge
 
 ---
 
-### Pre-built Packages and Binaries
+### Pre-built Installers and Binaries
 Download pre-built packages from [GitHub Releases](https://github.com/riccivr/clipbridge/releases):
-* macOS: `ClipBridge-1.1.0.dmg` (`ClipBridge.app` plus a daemon installer script).
-* Windows: `clipbridge.exe` (standalone executable) and `clipbridge-v1.1.0-windows-x64.zip`.
-* Linux: `clipbridge-v1.1.0-linux-x86_64.tar.gz`.
-* Debian / Ubuntu: `clipbridge_1.1.0_amd64.deb`.
+* **Windows (Installer)**: `clipbridge-setup.exe` (installs to `%LOCALAPPDATA%\ClipBridge` and creates Start Menu launcher).
+* **Windows (Portable)**: `clipbridge-portable.exe` and `clipbridge-v1.1.0-windows-x64.zip` (standalone executable requiring no installation).
+* **macOS**: `ClipBridge-1.1.0.dmg` (`ClipBridge.app` drag-and-drop installer to `/Applications`).
+* **Debian / Ubuntu**: `clipbridge_1.1.0_amd64.deb` (includes desktop launcher and system icons).
+* **Linux**: `clipbridge-v1.1.0-linux-x86_64.tar.gz`.
 
 Setup and Hotkeys
 -----------------

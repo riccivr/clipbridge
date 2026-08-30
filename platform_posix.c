@@ -6,6 +6,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <sys/file.h>
 #include "clipbridge.h"
 #include "unipaste.h"
 
@@ -162,6 +164,17 @@ clipboard_watch(const struct config *cfg)
 	char *curr_html = NULL;
 	size_t curr_len = 0;
 	struct sigaction sa;
+	int lock_fd;
+
+	/* Singleton check on POSIX */
+	lock_fd = open("/tmp/clipbridge.lock", O_RDWR | O_CREAT, 0666);
+	if (lock_fd >= 0) {
+		if (flock(lock_fd, LOCK_EX | LOCK_NB) != 0) {
+			fprintf(stderr, "clipbridge: another instance is already running.\n");
+			close(lock_fd);
+			return 0;
+		}
+	}
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = sig_handler;
