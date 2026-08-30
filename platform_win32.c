@@ -468,7 +468,9 @@ clipboard_watch(const struct config *cfg)
 	nid.uID = 1;
 	nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
 	nid.uCallbackMessage = WM_TRAYICON;
-	nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1));
+	if (!nid.hIcon)
+		nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 	snprintf(nid.szTip, sizeof(nid.szTip), "ClipBridge (Press Ctrl+Alt+V to paste)");
 
 	Shell_NotifyIconA(NIM_ADD, &nid);

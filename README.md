@@ -1,5 +1,9 @@
-clipbridge
-==========
+<p align="center">
+  <img src="assets/logo.png" alt="ClipBridge Logo" width="140" height="140" />
+</p>
+
+# clipbridge
+
 `clipbridge` runs as a background daemon or one-shot command that formats clipboard HTML using the [`unipaste`](https://github.com/riccivr/unipaste) engine.
 
 The Problem
