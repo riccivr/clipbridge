@@ -17,7 +17,8 @@ UNIPASTE_OBJ = parser.o table.o entity.o strbuf.o plugin.o
 ifeq ($(UNAME_S),Darwin)
 PLATFORM_SRC = platform_macos.m
 PLATFORM_OBJ = platform_macos.o
-LDFLAGS = -Wl,-dead_strip -framework AppKit -framework Foundation
+CFLAGS += -arch arm64 -arch x86_64
+LDFLAGS = -arch arm64 -arch x86_64 -framework AppKit -framework Foundation
 else
 PLATFORM_SRC = platform_posix.c platform_win32.c
 PLATFORM_OBJ = platform_posix.o platform_win32.o
@@ -77,6 +78,23 @@ deb: all
 	dpkg-deb --root-owner-group --build $$T clipbridge_$(VERSION)_amd64.deb; \
 	rm -rf $$T; \
 	echo "Built clipbridge_$(VERSION)_amd64.deb"
+
+CC_ARM64 ?= aarch64-linux-gnu-gcc
+deb-arm64:
+	@T=$$(mktemp -d); \
+	mkdir -p $$T/DEBIAN $$T/usr/bin $$T/usr/share/man/man1 $$T/usr/share/applications $$T/usr/share/icons/hicolor/scalable/apps $$T/usr/share/pixmaps; \
+	$(CC_ARM64) $(CFLAGS) -std=c99 -pedantic -Wall -Wextra -Os -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"$(VERSION)\" -I../unipaste clipbridge.c i18n.c platform_posix.c $(UNIPASTE_SRC) -o $$T/usr/bin/clipbridge -s; \
+	sed "s/VERSION/$(VERSION)/g" < clipbridge.1 > $$T/usr/share/man/man1/clipbridge.1; \
+	cp packaging/clipbridge.desktop $$T/usr/share/applications/; \
+	cp assets/clipbridge.svg $$T/usr/share/icons/hicolor/scalable/apps/; \
+	cp assets/clipbridge.png $$T/usr/share/pixmaps/; \
+	chmod 755 $$T/usr/bin/clipbridge; \
+	chmod 644 $$T/usr/share/man/man1/clipbridge.1 $$T/usr/share/applications/clipbridge.desktop $$T/usr/share/icons/hicolor/scalable/apps/clipbridge.svg $$T/usr/share/pixmaps/clipbridge.png; \
+	printf "Package: clipbridge\nVersion: $(VERSION)\nSection: utils\nPriority: optional\nArchitecture: arm64\nMaintainer: Ricardo Veronese Ricci <riccivr@users.noreply.github.com>\nDescription: Universal clipboard bridge and background daemon powered by unipaste\n" > $$T/DEBIAN/control; \
+	chmod 755 $$T/DEBIAN; \
+	dpkg-deb --root-owner-group --build $$T clipbridge_$(VERSION)_arm64.deb; \
+	rm -rf $$T; \
+	echo "Built clipbridge_$(VERSION)_arm64.deb"
 
 CC_WIN32 ?= x86_64-w64-mingw32-gcc
 WINDRES  ?= x86_64-w64-mingw32-windres

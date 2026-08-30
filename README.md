@@ -76,11 +76,13 @@ choco install clipbridge
 
 ### Pre-built Installers and Binaries
 Download pre-built packages from [GitHub Releases](https://github.com/riccivr/clipbridge/releases):
-* **Windows (Installer)**: `clipbridge-setup.exe` (installs to `%LOCALAPPDATA%\ClipBridge` and creates Start Menu launcher).
-* **Windows (Portable)**: `clipbridge-portable.exe` and `clipbridge-v1.1.0-windows-x64.zip` (standalone executable requiring no installation).
-* **macOS**: `ClipBridge-1.1.0.dmg` (`ClipBridge.app` drag-and-drop installer to `/Applications`).
-* **Debian / Ubuntu**: `clipbridge_1.1.0_amd64.deb` (includes desktop launcher and system icons).
-* **Linux**: `clipbridge-v1.1.0-linux-x86_64.tar.gz`.
+* **macOS (Universal)**: `ClipBridge-1.1.0.dmg` (Universal binary for **Apple Silicon M1/M2/M3/M4 + Intel**).
+* **Windows (x64 Installer)**: `clipbridge-setup.exe` (installs to `%LOCALAPPDATA%\ClipBridge` and creates Start Menu launcher).
+* **Windows (x64 Portable)**: `clipbridge-portable.exe` and `clipbridge-v1.1.0-windows-x64.zip` (standalone executable).
+* **Debian / Ubuntu (x86_64)**: `clipbridge_1.1.0_amd64.deb`.
+* **Debian / Ubuntu (ARM64)**: `clipbridge_1.1.0_arm64.deb` (Raspberry Pi 64-bit / ARM servers).
+* **Linux (x86_64 Tarball)**: `clipbridge-v1.1.0-linux-x86_64.tar.gz`.
+* **Linux (ARM64 Tarball)**: `clipbridge-v1.1.0-linux-arm64.tar.gz`.
 
 Setup and Hotkeys
 -----------------
