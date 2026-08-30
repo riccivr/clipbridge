@@ -181,3 +181,9 @@ clipbridge [-w1kpruv] [-m mode] [-t table] [-l link]
 License
 -------
 MIT License. See LICENSE file for details.
+
+Acknowledgments & Credits
+-------------------------
+* **Brand & Icon Design**: Created with care by **Estefani Medina**. Special thanks to Estefani for designing the ClipBridge brand emblem.
+* **Core Conversion Engine**: Powered by **[unipaste](https://github.com/riccivr/unipaste)**.
+

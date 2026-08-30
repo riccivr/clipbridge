@@ -36,6 +36,7 @@ static const char *strings_en[STR_COUNT] = {
 	[STR_ABOUT_BODY]           = "ClipBridge - Universal Clipboard Daemon\n"
 	                             "Version: 1.1.0\n\n"
 	                             "Author: Ricardo Veronese Ricci\n"
+	                             "Icon Design: Estefani Medina\n"
 	                             "GitHub: https://github.com/riccivr/clipbridge\n\n"
 	                             "A lightweight clipboard formatting bridge powered by unipaste.\n"
 	                             "License: MIT License",
@@ -78,6 +79,7 @@ static const char *strings_es[STR_COUNT] = {
 	[STR_ABOUT_BODY]           = "ClipBridge - Demonio universal de portapapeles\n"
 	                             "Versión: 1.1.0\n\n"
 	                             "Autor: Ricardo Veronese Ricci\n"
+	                             "Diseño del icono: Estefani Medina\n"
 	                             "GitHub: https://github.com/riccivr/clipbridge\n\n"
 	                             "Un puente ligero de formateo de portapapeles impulsado por unipaste.\n"
 	                             "Licencia: Licencia MIT",
