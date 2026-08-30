@@ -77,7 +77,7 @@ deb: all
 
 CC_WIN32 ?= x86_64-w64-mingw32-gcc
 exe:
-	$(CC_WIN32) $(CFLAGS) -D_WIN32 clipbridge.c platform_win32.c $(UNIPASTE_SRC) -o clipbridge.exe -s -luser32
+	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows clipbridge.c platform_win32.c $(UNIPASTE_SRC) -o clipbridge.exe -s -luser32 -lshell32 -ladvapi32
 
 dmg: all
 	sh scripts/build_dmg.sh

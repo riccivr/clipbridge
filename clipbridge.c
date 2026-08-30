@@ -34,12 +34,31 @@ usage(void)
 	exit(1);
 }
 
+#ifdef _WIN32
+#include <windows.h>
+static void
+attach_console_if_needed(int argc)
+{
+	if (argc > 1) {
+		if (AttachConsole(ATTACH_PARENT_PROCESS)) {
+			freopen("CONOUT$", "w", stdout);
+			freopen("CONOUT$", "w", stderr);
+			freopen("CONIN$", "r", stdin);
+		}
+	}
+}
+#endif
+
 int
 main(int argc, char *argv[])
 {
 	struct config cfg;
 	enum bridge_action action = ACTION_WATCH;
 	char *arg;
+
+#ifdef _WIN32
+	attach_console_if_needed(argc);
+#endif
 
 	/* Default config */
 	memset(&cfg, 0, sizeof(cfg));

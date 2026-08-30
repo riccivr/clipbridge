@@ -138,6 +138,11 @@ To format on demand (`clipbridge -1`) using a keyboard shortcut:
   ```
   Enable and start: `systemctl --user enable --now clipbridge`
 
+### Windows System Tray & Startup
+When running `clipbridge.exe` on Windows, it runs silently in the background with zero terminal window and adds an icon to the system notification area (system tray):
+* **Left click or double click**: Quickly toggle formatting on or pause.
+* **Right click menu**: Change output mode (Plain, Markdown, ANSI), select table format (ASCII, Unicode, Markdown, TSV), run one-shot sync, or toggle **Start with Windows** (automatically registers into Windows startup).
+
 Usage
 -----
 ```
