@@ -53,11 +53,11 @@ clipbridge: $(OBJ)
 	$(CC) -o $@ $(OBJ) $(LDFLAGS)
 
 clean:
-	rm -f clipbridge $(OBJ) plugin.o platform_macos.o platform_posix.o platform_win32.o clipbridge-$(VERSION).tar.gz
+	rm -f clipbridge $(OBJ) plugin.o platform_macos.o platform_posix.o platform_win32.o clipbridge_res.o clipbridge-$(VERSION).tar.gz
 
 dist: clean
 	mkdir -p clipbridge-$(VERSION)/scripts clipbridge-$(VERSION)/packaging
-	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.1 arg.h clipbridge.h clipbridge.c platform_posix.c platform_win32.c platform_macos.m scripts packaging clipbridge-$(VERSION)
+	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.rc clipbridge.1 arg.h clipbridge.h clipbridge.c platform_posix.c platform_win32.c platform_macos.m scripts packaging clipbridge-$(VERSION)
 	tar -cf clipbridge-$(VERSION).tar clipbridge-$(VERSION)
 	gzip clipbridge-$(VERSION).tar
 	rm -rf clipbridge-$(VERSION)
@@ -76,8 +76,10 @@ deb: all
 	echo "Built clipbridge_$(VERSION)_amd64.deb"
 
 CC_WIN32 ?= x86_64-w64-mingw32-gcc
+WINDRES  ?= x86_64-w64-mingw32-windres
 exe:
-	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows clipbridge.c platform_win32.c $(UNIPASTE_SRC) -o clipbridge.exe -s -luser32 -lshell32 -ladvapi32
+	$(WINDRES) clipbridge.rc -O coff -o clipbridge_res.o
+	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows clipbridge.c platform_win32.c clipbridge_res.o $(UNIPASTE_SRC) -o clipbridge.exe -s -luser32 -lshell32 -ladvapi32
 
 dmg: all
 	sh scripts/build_dmg.sh
