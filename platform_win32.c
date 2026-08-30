@@ -20,7 +20,8 @@
 #define ID_TRAY_TABLE_MARKDOWN   1008
 #define ID_TRAY_TABLE_TSV        1009
 #define ID_TRAY_STARTUP          1010
-#define ID_TRAY_EXIT             1011
+#define ID_TRAY_ABOUT            1011
+#define ID_TRAY_EXIT             1012
 
 #define ID_HOTKEY_CTRL_ALT_V     2001
 #define ID_HOTKEY_WIN_ALT_V      2002
@@ -318,6 +319,7 @@ show_tray_menu(HWND hwnd)
 
 	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
 	AppendMenuA(hMenu, (is_startup_enabled() ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_STARTUP, "Start with Windows");
+	AppendMenuA(hMenu, MF_STRING, ID_TRAY_ABOUT, "About ClipBridge...");
 	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
 	AppendMenuA(hMenu, MF_STRING, ID_TRAY_EXIT, "Exit ClipBridge");
 
@@ -406,6 +408,17 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			break;
 		case ID_TRAY_STARTUP:
 			set_startup_enabled(!is_startup_enabled());
+			break;
+		case ID_TRAY_ABOUT:
+			MessageBoxA(hwnd,
+				"ClipBridge - Universal Clipboard Daemon\n"
+				"Version: " VERSION "\n\n"
+				"Author: Ricardo Ricci\n"
+				"GitHub: https://github.com/riccivr/clipbridge\n\n"
+				"A lightweight clipboard formatting bridge powered by unipaste.\n"
+				"License: MIT License",
+				"About ClipBridge",
+				MB_OK | MB_ICONINFORMATION);
 			break;
 		case ID_TRAY_EXIT:
 			PostQuitMessage(0);
