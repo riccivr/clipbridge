@@ -3,35 +3,40 @@ import io
 import struct
 from PIL import Image
 
-COLOR_SRC = "/mnt/c/Users/ricci/.gemini/antigravity/brain/30df34ec-5d4a-49e2-a886-a604571b4ba8/.user_uploaded/media_1788103524397.jpg"
-GRAY_SRC = "/mnt/c/Users/ricci/.gemini/antigravity/brain/30df34ec-5d4a-49e2-a886-a604571b4ba8/.user_uploaded/media_1788104247672.jpg"
+COLOR_SRC = "/mnt/c/Users/ricci/.gemini/antigravity/brain/30df34ec-5d4a-49e2-a886-a604571b4ba8/.user_uploaded/media_1788104590262.png"
+WHITE_SRC = "/mnt/c/Users/ricci/.gemini/antigravity/brain/30df34ec-5d4a-49e2-a886-a604571b4ba8/.user_uploaded/media_1788104587948.png"
 ASSETS_DIR = "assets"
 os.makedirs(ASSETS_DIR, exist_ok=True)
 
 def process_and_crop(src_path):
     img = Image.open(src_path).convert("RGBA")
-    bg_r, bg_g, bg_b = img.getpixel((5, 5))[:3]
-    datas = img.getdata()
-    new_data = []
-
-    for item in datas:
-        r, g, b, a = item
-        dist = ((r - bg_r)**2 + (g - bg_g)**2 + (b - bg_b)**2) ** 0.5
-        if dist < 12:
-            new_data.append((r, g, b, 0))
-        elif dist < 35:
-            alpha = int(255 * ((dist - 12) / (35 - 12)))
-            new_data.append((r, g, b, alpha))
-        else:
-            new_data.append(item)
-
-    img.putdata(new_data)
-    bbox = img.getbbox()
-    cropped = img.crop(bbox)
+    bg_sample = img.getpixel((5, 5))
+    print(f"Processing {src_path}: Size={img.size}, Mode={img.mode}, Corner={bg_sample}")
+    
+    # If corner is already transparent
+    if bg_sample[3] == 0:
+        cropped = img.crop(img.getbbox())
+    else:
+        bg_r, bg_g, bg_b = bg_sample[:3]
+        datas = img.getdata()
+        new_data = []
+        for item in datas:
+            r, g, b, a = item
+            dist = ((r - bg_r)**2 + (g - bg_g)**2 + (b - bg_b)**2) ** 0.5
+            if dist < 10:
+                new_data.append((r, g, b, 0))
+            elif dist < 32:
+                alpha = int(255 * ((dist - 10) / (32 - 10)))
+                new_data.append((r, g, b, alpha))
+            else:
+                new_data.append(item)
+        img.putdata(new_data)
+        bbox = img.getbbox()
+        cropped = img.crop(bbox)
 
     w, h = cropped.size
     max_dim = max(w, h)
-    pad = int(max_dim * 0.06)
+    pad = int(max_dim * 0.05)
     square_size = max_dim + pad * 2
 
     master = Image.new("RGBA", (square_size, square_size), (0, 0, 0, 0))
@@ -47,34 +52,33 @@ color_1024.save(os.path.join(ASSETS_DIR, "logo.png"), format="PNG", optimize=Tru
 color_256 = color_master.resize((256, 256), Image.Resampling.LANCZOS)
 color_256.save(os.path.join(ASSETS_DIR, "clipbridge.png"), format="PNG", optimize=True)
 
-# 2. Process Grayscale Master
-gray_master = process_and_crop(GRAY_SRC)
-gray_1024 = gray_master.resize((1024, 1024), Image.Resampling.LANCZOS)
-gray_1024.save(os.path.join(ASSETS_DIR, "clipbridge_gray.png"), format="PNG", optimize=True)
-gray_256 = gray_master.resize((256, 256), Image.Resampling.LANCZOS)
-gray_256.save(os.path.join(ASSETS_DIR, "tray_gray.png"), format="PNG", optimize=True)
-
-# 3. Create White Monocolor Master
-white_data = []
-for r, g, b, a in gray_master.getdata():
-    if a > 0:
-        # Convert luminance to opacity on pure white
-        lum = 0.299 * r + 0.587 * g + 0.114 * b
-        white_data.append((255, 255, 255, a))
-    else:
-        white_data.append((0, 0, 0, 0))
-
-white_master = Image.new("RGBA", gray_master.size)
-white_master.putdata(white_data)
+# 2. Process White Master
+white_master = process_and_crop(WHITE_SRC)
+white_1024 = white_master.resize((1024, 1024), Image.Resampling.LANCZOS)
+white_1024.save(os.path.join(ASSETS_DIR, "clipbridge_white.png"), format="PNG", optimize=True)
 white_256 = white_master.resize((256, 256), Image.Resampling.LANCZOS)
 white_256.save(os.path.join(ASSETS_DIR, "tray_white.png"), format="PNG", optimize=True)
 
-# 4. Generate Tray Templates for macOS and Linux (18x18, 36x36, 22x22, 44x44)
-tray_18 = gray_master.resize((18, 18), Image.Resampling.LANCZOS)
+# 3. Process Grayscale / Dark Template Variant from White Master
+gray_data = []
+for r, g, b, a in white_master.getdata():
+    if a > 0:
+        # Invert to dark gray/black mask with proper opacity
+        gray_data.append((30, 30, 30, a))
+    else:
+        gray_data.append((0, 0, 0, 0))
+
+gray_master = Image.new("RGBA", white_master.size)
+gray_master.putdata(gray_data)
+gray_256 = gray_master.resize((256, 256), Image.Resampling.LANCZOS)
+gray_256.save(os.path.join(ASSETS_DIR, "tray_gray.png"), format="PNG", optimize=True)
+
+# 4. Generate macOS / Linux Tray Template Icons (18x18, 36x36)
+tray_18 = white_master.resize((18, 18), Image.Resampling.LANCZOS)
 tray_18.save(os.path.join(ASSETS_DIR, "tray_template.png"), format="PNG")
-tray_36 = gray_master.resize((36, 36), Image.Resampling.LANCZOS)
+tray_36 = white_master.resize((36, 36), Image.Resampling.LANCZOS)
 tray_36.save(os.path.join(ASSETS_DIR, "tray_template@2x.png"), format="PNG")
-print("Saved assets/tray_gray.png, assets/tray_white.png, assets/tray_template.png, and assets/tray_template@2x.png")
+print("Saved assets/tray_white.png, assets/tray_gray.png, assets/tray_template.png, and assets/tray_template@2x.png")
 
 # 5. Windows .ico
 def save_windows_ico(filepath, master, size_list):
