@@ -206,9 +206,9 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdS
 			return 1;
 		}
 	} else {
-		/* Fallback: copy clipbridge.exe from current directory if resource is absent */
-		if (!CopyFileA("clipbridge.exe", destExe, FALSE)) {
-			MessageBoxA(NULL, "Could not find clipbridge.exe payload.", "Setup Error", MB_OK | MB_ICONERROR);
+		/* Fallback: copy clipbridge-portable.exe from current directory if resource is absent */
+		if (!CopyFileA("clipbridge-portable.exe", destExe, FALSE) && !CopyFileA("clipbridge.exe", destExe, FALSE)) {
+			MessageBoxA(NULL, "Could not find clipbridge-portable.exe payload.", "Setup Error", MB_OK | MB_ICONERROR);
 			return 1;
 		}
 	}

@@ -82,11 +82,11 @@ CC_WIN32 ?= x86_64-w64-mingw32-gcc
 WINDRES  ?= x86_64-w64-mingw32-windres
 exe:
 	$(WINDRES) clipbridge.rc -O coff -o clipbridge_res.o
-	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows clipbridge.c platform_win32.c i18n.c clipbridge_res.o $(UNIPASTE_SRC) -o clipbridge.exe -s -luser32 -lshell32 -ladvapi32
-	cp clipbridge.exe clipbridge-portable.exe
+	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows clipbridge.c platform_win32.c i18n.c clipbridge_res.o $(UNIPASTE_SRC) -o clipbridge-portable.exe -s -luser32 -lshell32 -ladvapi32
 	$(WINDRES) installer.rc -O coff -o installer_res.o
 	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows installer_win32.c i18n.c installer_res.o -o clipbridge-setup.exe -s -luser32 -lshell32 -ladvapi32 -lole32 -luuid
-	@echo "Built clipbridge.exe, clipbridge-portable.exe, and clipbridge-setup.exe"
+	rm -f clipbridge.exe
+	@echo "Built clipbridge-portable.exe and clipbridge-setup.exe"
 
 dmg: all
 	sh scripts/build_dmg.sh

@@ -1,7 +1,7 @@
 #include <windows.h>
 
 1 ICON "assets/icon.ico"
-2 BINARY "clipbridge.exe"
+2 BINARY "clipbridge-portable.exe"
 
 VS_VERSION_INFO VERSIONINFO
 FILEVERSION     1,1,0,0
