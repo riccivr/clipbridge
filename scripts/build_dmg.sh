@@ -26,6 +26,10 @@ chmod 755 "${STAGING_DIR}/${APP_NAME}.app/Contents/MacOS/clipbridge"
 cp Info.plist "${STAGING_DIR}/${APP_NAME}.app/Contents/Info.plist"
 if [ -f "assets/AppIcon.icns" ]; then
     cp assets/AppIcon.icns "${STAGING_DIR}/${APP_NAME}.app/Contents/Resources/AppIcon.icns"
+    cp assets/AppIcon.icns "${STAGING_DIR}/.VolumeIcon.icns"
+    if command -v SetFile >/dev/null 2>&1; then
+        SetFile -a C "${STAGING_DIR}"
+    fi
 fi
 
 # Add /Applications symlink for standard drag-and-drop installation
