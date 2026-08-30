@@ -37,7 +37,7 @@ static UINT cf_no_cloud = 0;
 static DWORD last_seq = 0;
 static struct config current_cfg;
 static int auto_format_default = 0; /* Off by default: Ctrl+C / Ctrl+V stay normal */
-static NOTIFYICONDATAA nid;
+static NOTIFYICONDATAW nid;
 static HWND g_hwnd = NULL;
 
 static void
@@ -312,10 +312,23 @@ load_language_preference(void)
 }
 
 static void
+append_menu_u8(HMENU hMenu, UINT uFlags, UINT_PTR uIDNewItem, const char *lpNewItem)
+{
+	if (!lpNewItem) {
+		AppendMenuW(hMenu, uFlags, uIDNewItem, NULL);
+		return;
+	}
+	wchar_t wbuf[512];
+	MultiByteToWideChar(CP_UTF8, 0, lpNewItem, -1, wbuf, sizeof(wbuf)/sizeof(wbuf[0]));
+	AppendMenuW(hMenu, uFlags, uIDNewItem, wbuf);
+}
+
+static void
 update_tray_tooltip(void)
 {
-	snprintf(nid.szTip, sizeof(nid.szTip), "%s", i18n_get(auto_format_default ? STR_TOOLTIP_AUTO : STR_TOOLTIP_ACTIVE));
-	Shell_NotifyIconA(NIM_MODIFY, &nid);
+	const char *tip = i18n_get(auto_format_default ? STR_TOOLTIP_AUTO : STR_TOOLTIP_ACTIVE);
+	MultiByteToWideChar(CP_UTF8, 0, tip, -1, nid.szTip, sizeof(nid.szTip)/sizeof(nid.szTip[0]));
+	Shell_NotifyIconW(NIM_MODIFY, &nid);
 }
 
 static void
@@ -330,37 +343,37 @@ show_tray_menu(HWND hwnd)
 	GetCursorPos(&pt);
 
 	/* Instant Paste Action */
-	AppendMenuA(hMenu, MF_STRING, ID_TRAY_PASTE_NOW, i18n_get(STR_PASTE_ACTIVE));
-	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
+	append_menu_u8(hMenu, MF_STRING, ID_TRAY_PASTE_NOW, i18n_get(STR_PASTE_ACTIVE));
+	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
 
 	/* Auto-format default toggle */
-	AppendMenuA(hMenu, (auto_format_default ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_AUTO_FORMAT, i18n_get(STR_AUTO_FORMAT));
-	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
+	append_menu_u8(hMenu, (auto_format_default ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_AUTO_FORMAT, i18n_get(STR_AUTO_FORMAT));
+	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
 
 	/* Mode submenu */
-	AppendMenuA(hModeMenu, (current_cfg.mode == MODE_PLAIN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_PLAIN, i18n_get(STR_MODE_PLAIN));
-	AppendMenuA(hModeMenu, (current_cfg.mode == MODE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_MARKDOWN, i18n_get(STR_MODE_MARKDOWN));
-	AppendMenuA(hModeMenu, (current_cfg.mode == MODE_TERMINAL ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_TERMINAL, i18n_get(STR_MODE_TERMINAL));
-	AppendMenuA(hMenu, MF_POPUP, (UINT_PTR)hModeMenu, i18n_get(STR_OUTPUT_MODE));
+	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_PLAIN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_PLAIN, i18n_get(STR_MODE_PLAIN));
+	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_MARKDOWN, i18n_get(STR_MODE_MARKDOWN));
+	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_TERMINAL ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_TERMINAL, i18n_get(STR_MODE_TERMINAL));
+	append_menu_u8(hMenu, MF_POPUP, (UINT_PTR)hModeMenu, i18n_get(STR_OUTPUT_MODE));
 
 	/* Table submenu */
-	AppendMenuA(hTableMenu, (current_cfg.table_style == TABLE_STYLE_GRID && !current_cfg.unicode_tables ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_GRID, i18n_get(STR_TABLE_GRID));
-	AppendMenuA(hTableMenu, (current_cfg.unicode_tables ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_UNICODE, i18n_get(STR_TABLE_UNICODE));
-	AppendMenuA(hTableMenu, (current_cfg.table_style == TABLE_STYLE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_MARKDOWN, i18n_get(STR_TABLE_MARKDOWN));
-	AppendMenuA(hTableMenu, (current_cfg.table_style == TABLE_STYLE_TSV ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_TSV, i18n_get(STR_TABLE_TSV));
-	AppendMenuA(hMenu, MF_POPUP, (UINT_PTR)hTableMenu, i18n_get(STR_TABLE_STYLE));
+	append_menu_u8(hTableMenu, (current_cfg.table_style == TABLE_STYLE_GRID && !current_cfg.unicode_tables ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_GRID, i18n_get(STR_TABLE_GRID));
+	append_menu_u8(hTableMenu, (current_cfg.unicode_tables ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_UNICODE, i18n_get(STR_TABLE_UNICODE));
+	append_menu_u8(hTableMenu, (current_cfg.table_style == TABLE_STYLE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_MARKDOWN, i18n_get(STR_TABLE_MARKDOWN));
+	append_menu_u8(hTableMenu, (current_cfg.table_style == TABLE_STYLE_TSV ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_TABLE_TSV, i18n_get(STR_TABLE_TSV));
+	append_menu_u8(hMenu, MF_POPUP, (UINT_PTR)hTableMenu, i18n_get(STR_TABLE_STYLE));
 
 	/* Language submenu */
-	AppendMenuA(hLangMenu, (i18n_get_language() == LANG_AUTO ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_LANG_AUTO, i18n_get(STR_LANG_AUTO));
-	AppendMenuA(hLangMenu, (i18n_get_language() == LANG_EN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_LANG_EN, i18n_get(STR_LANG_EN));
-	AppendMenuA(hLangMenu, (i18n_get_language() == LANG_ES ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_LANG_ES, i18n_get(STR_LANG_ES));
-	AppendMenuA(hMenu, MF_POPUP, (UINT_PTR)hLangMenu, i18n_get(STR_LANGUAGE));
+	append_menu_u8(hLangMenu, (i18n_get_language() == LANG_AUTO ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_LANG_AUTO, i18n_get(STR_LANG_AUTO));
+	append_menu_u8(hLangMenu, (i18n_get_language() == LANG_EN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_LANG_EN, i18n_get(STR_LANG_EN));
+	append_menu_u8(hLangMenu, (i18n_get_language() == LANG_ES ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_LANG_ES, i18n_get(STR_LANG_ES));
+	append_menu_u8(hMenu, MF_POPUP, (UINT_PTR)hLangMenu, i18n_get(STR_LANGUAGE));
 
-	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
-	AppendMenuA(hMenu, (is_startup_enabled() ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_STARTUP, i18n_get(STR_STARTUP));
-	AppendMenuA(hMenu, MF_STRING, ID_TRAY_ABOUT, i18n_get(STR_ABOUT_MENU));
-	AppendMenuA(hMenu, MF_SEPARATOR, 0, NULL);
-	AppendMenuA(hMenu, MF_STRING, ID_TRAY_EXIT, i18n_get(STR_EXIT));
+	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
+	append_menu_u8(hMenu, (is_startup_enabled() ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_STARTUP, i18n_get(STR_STARTUP));
+	append_menu_u8(hMenu, MF_STRING, ID_TRAY_ABOUT, i18n_get(STR_ABOUT_MENU));
+	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
+	append_menu_u8(hMenu, MF_STRING, ID_TRAY_EXIT, i18n_get(STR_EXIT));
 
 	SetForegroundWindow(hwnd);
 	TrackPopupMenu(hMenu, TPM_RIGHTALIGN | TPM_BOTTOMALIGN, pt.x, pt.y, 0, hwnd, NULL);
@@ -464,12 +477,14 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case ID_TRAY_STARTUP:
 			set_startup_enabled(!is_startup_enabled());
 			break;
-		case ID_TRAY_ABOUT:
-			MessageBoxA(hwnd,
-				i18n_get(STR_ABOUT_BODY),
-				i18n_get(STR_ABOUT_TITLE),
-				MB_OK | MB_ICONINFORMATION);
+		case ID_TRAY_ABOUT: {
+			wchar_t title[128];
+			wchar_t body[1024];
+			MultiByteToWideChar(CP_UTF8, 0, i18n_get(STR_ABOUT_TITLE), -1, title, sizeof(title)/sizeof(title[0]));
+			MultiByteToWideChar(CP_UTF8, 0, i18n_get(STR_ABOUT_BODY), -1, body, sizeof(body)/sizeof(body[0]));
+			MessageBoxW(hwnd, body, title, MB_OK | MB_ICONINFORMATION);
 			break;
+		}
 		case ID_TRAY_EXIT:
 			PostQuitMessage(0);
 			break;
@@ -480,7 +495,7 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	case WM_DESTROY:
 		UnregisterHotKey(hwnd, ID_HOTKEY_CTRL_ALT_V);
 		UnregisterHotKey(hwnd, ID_HOTKEY_WIN_ALT_V);
-		Shell_NotifyIconA(NIM_DELETE, &nid);
+		Shell_NotifyIconW(NIM_DELETE, &nid);
 		PostQuitMessage(0);
 		return 0;
 	}
@@ -541,7 +556,7 @@ clipboard_watch(const struct config *cfg)
 
 	/* Initialize and display system tray notification icon */
 	memset(&nid, 0, sizeof(nid));
-	nid.cbSize = sizeof(NOTIFYICONDATAA);
+	nid.cbSize = sizeof(NOTIFYICONDATAW);
 	nid.hWnd = g_hwnd;
 	nid.uID = 1;
 	nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
@@ -549,9 +564,10 @@ clipboard_watch(const struct config *cfg)
 	nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1));
 	if (!nid.hIcon)
 		nid.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	snprintf(nid.szTip, sizeof(nid.szTip), "%s", i18n_get(STR_TOOLTIP_ACTIVE));
+	const char *tip = i18n_get(STR_TOOLTIP_ACTIVE);
+	MultiByteToWideChar(CP_UTF8, 0, tip, -1, nid.szTip, sizeof(nid.szTip)/sizeof(nid.szTip[0]));
 
-	Shell_NotifyIconA(NIM_ADD, &nid);
+	Shell_NotifyIconW(NIM_ADD, &nid);
 
 	while (GetMessage(&msg, NULL, 0, 0) > 0) {
 		TranslateMessage(&msg);
@@ -561,7 +577,7 @@ clipboard_watch(const struct config *cfg)
 	RemoveClipboardFormatListener(g_hwnd);
 	UnregisterHotKey(g_hwnd, ID_HOTKEY_CTRL_ALT_V);
 	UnregisterHotKey(g_hwnd, ID_HOTKEY_WIN_ALT_V);
-	Shell_NotifyIconA(NIM_DELETE, &nid);
+	Shell_NotifyIconW(NIM_DELETE, &nid);
 	DestroyWindow(g_hwnd);
 	return 0;
 }
