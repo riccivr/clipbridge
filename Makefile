@@ -5,10 +5,11 @@ include config.mk
 
 UNAME_S := $(shell uname -s)
 
-PLUGIN_SRC = ../unipaste/plugin_none.c
-ifeq ($(SANITIZE),builtin)
 PLUGIN_SRC = ../unipaste/plugin_builtin.c
 CFLAGS += -DSANITIZE_BUILTIN
+ifeq ($(SANITIZE),none)
+PLUGIN_SRC = ../unipaste/plugin_none.c
+CFLAGS := $(filter-out -DSANITIZE_BUILTIN,$(CFLAGS))
 endif
 
 UNIPASTE_SRC = ../unipaste/parser.c ../unipaste/table.c ../unipaste/entity.c ../unipaste/strbuf.c $(PLUGIN_SRC)
