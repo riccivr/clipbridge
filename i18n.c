@@ -34,7 +34,7 @@ static const char *strings_en[STR_COUNT] = {
 	[STR_ABOUT_TITLE]          = "About ClipBridge",
 	[STR_ABOUT_MENU]           = "About ClipBridge...",
 	[STR_ABOUT_BODY]           = "ClipBridge - Universal Clipboard Daemon\n"
-	                             "Version: 1.1.0\n\n"
+	                             "Version: " VERSION "\n\n"
 	                             "Author: Ricardo Veronese Ricci (https://github.com/riccivr)\n"
 	                             "Icon Design: Estefani Medina (https://github.com/estephmediseno)\n"
 	                             "Project: https://github.com/riccivr/clipbridge\n\n"
@@ -77,7 +77,7 @@ static const char *strings_es[STR_COUNT] = {
 	[STR_ABOUT_TITLE]          = "Acerca de ClipBridge",
 	[STR_ABOUT_MENU]           = "Acerca de ClipBridge...",
 	[STR_ABOUT_BODY]           = "ClipBridge - Demonio universal de portapapeles\n"
-	                             "Versión: 1.1.0\n\n"
+	                             "Versión: " VERSION "\n\n"
 	                             "Autor: Ricardo Veronese Ricci (https://github.com/riccivr)\n"
 	                             "Diseño del icono: Estefani Medina (https://github.com/estephmediseno)\n"
 	                             "Proyecto: https://github.com/riccivr/clipbridge\n\n"
