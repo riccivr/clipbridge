@@ -65,7 +65,7 @@ yay -S clipbridge
 
 #### Debian and Ubuntu (.deb)
 ```sh
-sudo dpkg -i clipbridge_1.2.2_amd64.deb
+sudo dpkg -i clipbridge_1.3.0_amd64.deb
 ```
 
 #### Windows (Chocolatey)
@@ -77,13 +77,13 @@ choco install clipbridge
 
 ### Pre-built Installers and Binaries
 Download pre-built packages from [GitHub Releases](https://github.com/riccivr/clipbridge/releases):
-* **macOS (Universal)**: `ClipBridge-1.2.2.dmg` (Universal binary for **Apple Silicon M1/M2/M3/M4 + Intel**).
+* **macOS (Universal)**: `ClipBridge-1.3.0.dmg` (Universal binary for **Apple Silicon M1/M2/M3/M4 + Intel**).
 * **Windows (x64 Installer)**: `clipbridge-setup.exe` (installs to `%LOCALAPPDATA%\ClipBridge` and creates Start Menu launcher).
-* **Windows (x64 Portable)**: `clipbridge-portable.exe` and `clipbridge-v1.2.2-windows-x64.zip` (standalone executable).
-* **Debian / Ubuntu (x86_64)**: `clipbridge_1.2.2_amd64.deb`.
-* **Debian / Ubuntu (ARM64)**: `clipbridge_1.2.2_arm64.deb` (Raspberry Pi 64-bit / ARM servers).
-* **Linux (x86_64 Tarball)**: `clipbridge-v1.2.2-linux-x86_64.tar.gz`.
-* **Linux (ARM64 Tarball)**: `clipbridge-v1.2.2-linux-arm64.tar.gz`.
+* **Windows (x64 Portable)**: `clipbridge-portable.exe` and `clipbridge-v1.3.0-windows-x64.zip` (standalone executable).
+* **Debian / Ubuntu (x86_64)**: `clipbridge_1.3.0_amd64.deb`.
+* **Debian / Ubuntu (ARM64)**: `clipbridge_1.3.0_arm64.deb` (Raspberry Pi 64-bit / ARM servers).
+* **Linux (x86_64 Tarball)**: `clipbridge-v1.3.0-linux-x86_64.tar.gz`.
+* **Linux (ARM64 Tarball)**: `clipbridge-v1.3.0-linux-arm64.tar.gz`.
 
 Setup and Hotkeys
 -----------------

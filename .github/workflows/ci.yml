@@ -1,0 +1,77 @@
+name: CI Test Matrix
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test-linux:
+    name: Linux (x86_64, ARM64, MinGW Win64, Debian)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout unipaste dependency
+        uses: actions/checkout@v4
+        with:
+          repository: riccivr/unipaste
+          path: unipaste
+
+      - name: Setup unipaste engine dependency
+        run: |
+          mkdir -p ../unipaste
+          cp -R unipaste/* ../unipaste/
+
+      - name: Install Toolchains
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-mingw-w64-x86-64 gcc-aarch64-linux-gnu zip
+
+      - name: Build & Run Linux Smoke Tests
+        run: |
+          make clean
+          make test
+
+      - name: Build Debian x86_64 Package
+        run: make deb
+
+      - name: Build Linux ARM64 Debian Package
+        run: make deb-arm64
+
+      - name: Build Windows Executables (Setup & Portable)
+        run: make exe
+
+      - name: Build Source Distribution Tarball
+        run: make dist
+
+  test-macos:
+    name: macOS (Universal M1/M2/M3/M4 + Intel)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout unipaste dependency
+        uses: actions/checkout@v4
+        with:
+          repository: riccivr/unipaste
+          path: unipaste
+
+      - name: Setup unipaste engine dependency
+        run: |
+          mkdir -p ../unipaste
+          cp -R unipaste/* ../unipaste/
+
+      - name: Build & Run Smoke Tests
+        run: |
+          make clean
+          make test
+
+      - name: Build Universal macOS Application & DMG
+        run: make dmg
