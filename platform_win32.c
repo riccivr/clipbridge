@@ -144,6 +144,9 @@ clipboard_write_text(const char *text, size_t len)
 		return -1;
 	}
 
+	/* Clear existing rich formats (HTML, RTF, images) so apps are forced to paste our formatted plain text */
+	EmptyClipboard();
+
 	/* Update Unicode Plaintext on Clipboard */
 	SetClipboardData(CF_UNICODETEXT, hMem);
 	CloseClipboard();
