@@ -179,10 +179,6 @@ clipbridge [-w1kpruv] [-m mode] [-t table] [-l link]
 * `-v`: Print version.
 * `-h`: Display help message.
 
-License
--------
-MIT License. See LICENSE file for details.
-
 Acknowledgments & Credits
 -------------------------
 * **Brand & Icon Design**: Created with care by **Estefani Medina** ([@estephmediseno](https://github.com/estephmediseno)). Special thanks to Estefani for designing the ClipBridge brand emblem.
