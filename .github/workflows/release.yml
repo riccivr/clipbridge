@@ -67,21 +67,21 @@ jobs:
         run: |
           make clean
           make
-          tar -czvf clipbridge-v1.1.0-linux-x86_64.tar.gz clipbridge clipbridge.1 README.md LICENSE
+          tar -czvf clipbridge-v1.2.0-linux-x86_64.tar.gz clipbridge clipbridge.1 README.md LICENSE
           make deb
 
       - name: Build Linux ARM64 Binaries (.deb & .tar.gz)
         run: |
           make deb-arm64
-          aarch64-linux-gnu-gcc -std=c99 -pedantic -Wall -Wextra -Os -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"1.1.0\" -I../unipaste clipbridge.c i18n.c platform_posix.c ../unipaste/parser.c ../unipaste/table.c ../unipaste/entity.c ../unipaste/strbuf.c ../unipaste/plugin_none.c -o clipbridge-arm64 -s
-          tar -czvf clipbridge-v1.1.0-linux-arm64.tar.gz -C . clipbridge-arm64 clipbridge.1 README.md LICENSE
+          aarch64-linux-gnu-gcc -std=c99 -pedantic -Wall -Wextra -Os -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"1.2.0\" -I../unipaste clipbridge.c i18n.c platform_posix.c ../unipaste/parser.c ../unipaste/table.c ../unipaste/entity.c ../unipaste/strbuf.c ../unipaste/plugin_none.c -o clipbridge-arm64 -s
+          tar -czvf clipbridge-v1.2.0-linux-arm64.tar.gz -C . clipbridge-arm64 clipbridge.1 README.md LICENSE
 
       - name: Build Windows x64 Binaries (Setup & Portable)
         run: |
           make exe
           cp clipbridge-setup.exe clipbridge-setup-x64.exe
           cp clipbridge-portable.exe clipbridge-portable-x64.exe
-          zip -j clipbridge-v1.1.0-windows-x64.zip clipbridge-portable.exe clipbridge.1 README.md LICENSE
+          zip -j clipbridge-v1.2.0-windows-x64.zip clipbridge-portable.exe clipbridge.1 README.md LICENSE
 
       - name: Publish Multi-Architecture Assets to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -89,14 +89,14 @@ jobs:
         with:
           files: |
             clipbridge-*.tar.gz
-            clipbridge-v1.1.0-linux-x86_64.tar.gz
-            clipbridge-v1.1.0-linux-arm64.tar.gz
+            clipbridge-v1.2.0-linux-x86_64.tar.gz
+            clipbridge-v1.2.0-linux-arm64.tar.gz
             clipbridge_*_amd64.deb
             clipbridge_*_arm64.deb
             clipbridge-setup.exe
             clipbridge-setup-x64.exe
             clipbridge-portable.exe
             clipbridge-portable-x64.exe
-            clipbridge-v1.1.0-windows-x64.zip
+            clipbridge-v1.2.0-windows-x64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

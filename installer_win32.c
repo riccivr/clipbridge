@@ -14,7 +14,7 @@
 #include <string.h>
 #include "i18n.h"
 
-#define VERSION "1.1.0"
+#define VERSION "1.2.0"
 
 static int user_cancelled = 0;
 
@@ -383,7 +383,7 @@ wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdS
 	/* 7. Register in Windows Uninstall Programs */
 	if (RegCreateKeyExW(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ClipBridge", 0, NULL, 0, KEY_SET_VALUE, NULL, &hKey, NULL) == ERROR_SUCCESS) {
 		const wchar_t *name = L"ClipBridge";
-		const wchar_t *version = L"1.1.0";
+		const wchar_t *version = L"1.2.0";
 		const wchar_t *publisher = L"Ricardo Veronese Ricci";
 		wchar_t uninstCmd[MAX_PATH * 2];
 		_snwprintf(uninstCmd, sizeof(uninstCmd) / sizeof(wchar_t), L"\"%ls\" --uninstall", destExe);

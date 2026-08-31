@@ -1,6 +1,6 @@
 # Maintainer: Ricardo Veronese Ricci <ricci.vr@gmail.com>
 pkgname=clipbridge
-pkgver=1.1.0
+pkgver=1.2.0
 pkgrel=1
 pkgdesc="Universal clipboard bridge and background daemon powered by unipaste"
 arch=('x86_64' 'aarch64' 'armv7h' 'i686')
