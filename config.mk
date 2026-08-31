@@ -1,5 +1,5 @@
 # clipbridge version
-VERSION = 1.1.0
+VERSION = 1.2.1
 
 # Customize below to fit your system
 
