@@ -73,7 +73,7 @@ deb: all
 	cp assets/clipbridge.png $$T/usr/share/pixmaps/; \
 	chmod 755 $$T/usr/bin/clipbridge; \
 	chmod 644 $$T/usr/share/man/man1/clipbridge.1 $$T/usr/share/applications/clipbridge.desktop $$T/usr/share/icons/hicolor/scalable/apps/clipbridge.svg $$T/usr/share/pixmaps/clipbridge.png; \
-	printf "Package: clipbridge\nVersion: $(VERSION)\nSection: utils\nPriority: optional\nArchitecture: amd64\nMaintainer: Ricardo Veronese Ricci <riccivr@users.noreply.github.com>\nDescription: Universal clipboard bridge and background daemon powered by unipaste\n" > $$T/DEBIAN/control; \
+	printf "Package: clipbridge\nVersion: $(VERSION)\nSection: utils\nPriority: optional\nArchitecture: amd64\nMaintainer: Ricardo Veronese Ricci <ricci.vr@gmail.com>\nDescription: Universal clipboard bridge and background daemon powered by unipaste\n" > $$T/DEBIAN/control; \
 	chmod 755 $$T/DEBIAN; \
 	dpkg-deb --root-owner-group --build $$T clipbridge_$(VERSION)_amd64.deb; \
 	rm -rf $$T; \
@@ -90,7 +90,7 @@ deb-arm64:
 	cp assets/clipbridge.png $$T/usr/share/pixmaps/; \
 	chmod 755 $$T/usr/bin/clipbridge; \
 	chmod 644 $$T/usr/share/man/man1/clipbridge.1 $$T/usr/share/applications/clipbridge.desktop $$T/usr/share/icons/hicolor/scalable/apps/clipbridge.svg $$T/usr/share/pixmaps/clipbridge.png; \
-	printf "Package: clipbridge\nVersion: $(VERSION)\nSection: utils\nPriority: optional\nArchitecture: arm64\nMaintainer: Ricardo Veronese Ricci <riccivr@users.noreply.github.com>\nDescription: Universal clipboard bridge and background daemon powered by unipaste\n" > $$T/DEBIAN/control; \
+	printf "Package: clipbridge\nVersion: $(VERSION)\nSection: utils\nPriority: optional\nArchitecture: arm64\nMaintainer: Ricardo Veronese Ricci <ricci.vr@gmail.com>\nDescription: Universal clipboard bridge and background daemon powered by unipaste\n" > $$T/DEBIAN/control; \
 	chmod 755 $$T/DEBIAN; \
 	dpkg-deb --root-owner-group --build $$T clipbridge_$(VERSION)_arm64.deb; \
 	rm -rf $$T; \
