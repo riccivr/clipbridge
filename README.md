@@ -15,13 +15,13 @@ When you paste into plain-text targets (Notepad, terminals, vim, code editors), 
 
 How clipbridge Works
 --------------------
-`clipbridge` listens for clipboard updates with native OS event hooks. When an application puts HTML on the clipboard, `clipbridge` runs the HTML through the `unipaste` engine and writes beautiful, formatted plain text (tables, code blocks, lists, links) into the clipboard. It clears legacy rich formats, forcing all applications (IDEs, Word, Slack, terminals) to paste your perfectly formatted plain text.
+`clipbridge` listens for clipboard updates with native OS event hooks. When an application puts HTML on the clipboard, `clipbridge` runs the HTML through the `unipaste` engine and writes formatted plain text (tables, code blocks, lists, links) into the plain-text clipboard slot. It leaves the original HTML slot unchanged.
 
 Features
 --------
 * Uses the `unipaste` C99 parsing and formatting engine.
 * Zero external runtime dependencies.
-* Forces perfectly formatted text (Markdown/ASCII) across all applications.
+* Leaves the rich HTML slot untouched while updating the plain-text slot.
 * Skips clipboard updates marked private by password managers (`Clipboard Viewer Ignore`, `CanIncludeInClipboardHistory`, and `org.nspasteboard.ConcealedType` from 1Password, Bitwarden, KeePassXC, and Apple Keychain).
 * Platform support:
   * macOS: Native Cocoa/AppKit `NSPasteboard` changeCount tracking.

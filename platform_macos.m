@@ -76,9 +76,6 @@ clipboard_write_text(const char *text, size_t len)
 		if (!str)
 			return -1;
 
-		/* Clear existing rich formats so apps are forced to paste our formatted plain text */
-		[pboard clearContents];
-
 		/* Update plain-text representation */
 		[pboard setString:str forType:NSPasteboardTypeString];
 		return 0;
