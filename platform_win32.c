@@ -26,6 +26,10 @@
 #define ID_TRAY_STARTUP          1013
 #define ID_TRAY_ABOUT            1014
 #define ID_TRAY_EXIT             1015
+#define ID_TRAY_MODE_SLACK       1016
+#define ID_TRAY_MODE_JIRA        1017
+#define ID_TRAY_STRIP_TRACKING   1018
+#define ID_TRAY_PAUSE_15M        1019
 
 #define ID_HOTKEY_CTRL_ALT_V     2001
 #define ID_HOTKEY_WIN_ALT_V      2002
@@ -37,6 +41,7 @@ static UINT cf_no_cloud = 0;
 static DWORD last_seq = 0;
 static struct config current_cfg;
 static int auto_format_default = 0; /* Off by default: Ctrl+C / Ctrl+V stay normal */
+static DWORD pause_until_tick = 0;
 static NOTIFYICONDATAW nid;
 static HWND g_hwnd = NULL;
 
@@ -348,11 +353,14 @@ show_tray_menu(HWND hwnd)
 
 	/* Auto-format default toggle */
 	append_menu_u8(hMenu, (auto_format_default ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_AUTO_FORMAT, i18n_get(STR_AUTO_FORMAT));
+	append_menu_u8(hMenu, (!current_cfg.keep_tracking ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_STRIP_TRACKING, i18n_get(STR_STRIP_TRACKING));
 	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
 
 	/* Mode submenu */
 	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_PLAIN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_PLAIN, i18n_get(STR_MODE_PLAIN));
 	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_MARKDOWN, i18n_get(STR_MODE_MARKDOWN));
+	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_SLACK ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_SLACK, i18n_get(STR_MODE_SLACK));
+	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_JIRA ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_JIRA, i18n_get(STR_MODE_JIRA));
 	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_TERMINAL ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_TERMINAL, i18n_get(STR_MODE_TERMINAL));
 	append_menu_u8(hMenu, MF_POPUP, (UINT_PTR)hModeMenu, i18n_get(STR_OUTPUT_MODE));
 
@@ -391,6 +399,9 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg) {
 	case WM_CLIPBOARDUPDATE: {
 		if (!auto_format_default)
+			return 0;
+
+		if (pause_until_tick && GetTickCount() < pause_until_tick)
 			return 0;
 
 		DWORD seq = GetClipboardSequenceNumber();
@@ -436,11 +447,20 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			auto_format_default = !auto_format_default;
 			update_tray_tooltip();
 			break;
+		case ID_TRAY_STRIP_TRACKING:
+			current_cfg.keep_tracking = !current_cfg.keep_tracking;
+			break;
 		case ID_TRAY_MODE_PLAIN:
 			current_cfg.mode = MODE_PLAIN;
 			break;
 		case ID_TRAY_MODE_MARKDOWN:
 			current_cfg.mode = MODE_MARKDOWN;
+			break;
+		case ID_TRAY_MODE_SLACK:
+			current_cfg.mode = MODE_SLACK;
+			break;
+		case ID_TRAY_MODE_JIRA:
+			current_cfg.mode = MODE_JIRA;
 			break;
 		case ID_TRAY_MODE_TERMINAL:
 			current_cfg.mode = MODE_TERMINAL;

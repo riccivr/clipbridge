@@ -304,6 +304,13 @@ create_status_bar_template_icon(void)
 	[self.autoFormatItem setState:(auto_format_default ? NSControlStateValueOn : NSControlStateValueOff)];
 	[menu addItem:self.autoFormatItem];
 
+	/* Strip Tracking */
+	NSString *trackTitle = [NSString stringWithUTF8String:i18n_get(STR_STRIP_TRACKING)];
+	NSMenuItem *trackItem = [[NSMenuItem alloc] initWithTitle:trackTitle action:@selector(toggleStripTracking:) keyEquivalent:@""];
+	[trackItem setTarget:self];
+	[trackItem setState:(!current_cfg.keep_tracking ? NSControlStateValueOn : NSControlStateValueOff)];
+	[menu addItem:trackItem];
+
 	[menu addItem:[NSMenuItem separatorItem]];
 
 	/* Mode Submenu */
@@ -320,6 +327,16 @@ create_status_bar_template_icon(void)
 	[mMarkdown setTarget:self];
 	[mMarkdown setState:(current_cfg.mode == MODE_MARKDOWN ? NSControlStateValueOn : NSControlStateValueOff)];
 	[modeMenu addItem:mMarkdown];
+
+	NSMenuItem *mSlack = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_MODE_SLACK)] action:@selector(setModeSlack:) keyEquivalent:@""];
+	[mSlack setTarget:self];
+	[mSlack setState:(current_cfg.mode == MODE_SLACK ? NSControlStateValueOn : NSControlStateValueOff)];
+	[modeMenu addItem:mSlack];
+
+	NSMenuItem *mJira = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_MODE_JIRA)] action:@selector(setModeJira:) keyEquivalent:@""];
+	[mJira setTarget:self];
+	[mJira setState:(current_cfg.mode == MODE_JIRA ? NSControlStateValueOn : NSControlStateValueOff)];
+	[modeMenu addItem:mJira];
 
 	NSMenuItem *mTerminal = [[NSMenuItem alloc] initWithTitle:[NSString stringWithUTF8String:i18n_get(STR_MODE_TERMINAL)] action:@selector(setModeTerminal:) keyEquivalent:@""];
 	[mTerminal setTarget:self];
@@ -438,8 +455,16 @@ create_status_bar_template_icon(void)
 	[self buildMenu];
 }
 
+- (void)toggleStripTracking:(id)sender {
+	(void)sender;
+	current_cfg.keep_tracking = !current_cfg.keep_tracking;
+	[self buildMenu];
+}
+
 - (void)setModePlain:(id)sender { (void)sender; current_cfg.mode = MODE_PLAIN; [self buildMenu]; }
 - (void)setModeMarkdown:(id)sender { (void)sender; current_cfg.mode = MODE_MARKDOWN; [self buildMenu]; }
+- (void)setModeSlack:(id)sender { (void)sender; current_cfg.mode = MODE_SLACK; [self buildMenu]; }
+- (void)setModeJira:(id)sender { (void)sender; current_cfg.mode = MODE_JIRA; [self buildMenu]; }
 - (void)setModeTerminal:(id)sender { (void)sender; current_cfg.mode = MODE_TERMINAL; [self buildMenu]; }
 - (void)setTableGrid:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_GRID; current_cfg.unicode_tables = 0; [self buildMenu]; }
 - (void)setTableUnicode:(id)sender { (void)sender; current_cfg.table_style = TABLE_STYLE_GRID; current_cfg.unicode_tables = 1; [self buildMenu]; }

@@ -19,7 +19,7 @@ enum bridge_action {
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-w1kpruv] [-m mode] [-t table] [-l link] [--uninstall]\n", argv0);
+	fprintf(stderr, "usage: %s [-w1kpruvKh] [-m mode] [-t table] [-l link] [--uninstall]\n", argv0);
 	fprintf(stderr, "\nActions:\n");
 	fprintf(stderr, "  -w            Watch clipboard continuously and auto-sync (default)\n");
 	fprintf(stderr, "  -1            Perform single clipboard synchronization and exit\n");
@@ -27,9 +27,10 @@ usage(void)
 	fprintf(stderr, "  -p            Print formatted clipboard content directly to stdout\n");
 	fprintf(stderr, "  --uninstall   Uninstall ClipBridge desktop shortcuts and user configuration\n");
 	fprintf(stderr, "\nFormatting Options:\n");
-	fprintf(stderr, "  -m mode       Output mode: plain (default), markdown, terminal\n");
+	fprintf(stderr, "  -m mode       Output mode: plain (default), markdown, slack, jira, terminal\n");
 	fprintf(stderr, "  -t table      Table format: grid (default), markdown, tsv, simple\n");
 	fprintf(stderr, "  -l link       Link format: bracket (default), inline, text, footnote\n");
+	fprintf(stderr, "  -K            Keep URL tracking & telemetry parameters\n");
 	fprintf(stderr, "  -u            Use Unicode box-drawing characters for tables\n");
 	fprintf(stderr, "  -r            Emit Windows CRLF (\\r\\n) line endings\n");
 	fprintf(stderr, "  -v            Display version information\n");
@@ -166,6 +167,10 @@ main(int argc, char *argv[])
 			cfg.mode = MODE_PLAIN;
 		else if (strcmp(arg, "markdown") == 0 || strcmp(arg, "md") == 0)
 			cfg.mode = MODE_MARKDOWN;
+		else if (strcmp(arg, "slack") == 0 || strcmp(arg, "mrkdwn") == 0)
+			cfg.mode = MODE_SLACK;
+		else if (strcmp(arg, "jira") == 0 || strcmp(arg, "confluence") == 0)
+			cfg.mode = MODE_JIRA;
 		else if (strcmp(arg, "terminal") == 0 || strcmp(arg, "ansi") == 0)
 			cfg.mode = MODE_TERMINAL;
 		else {
@@ -202,6 +207,9 @@ main(int argc, char *argv[])
 			fprintf(stderr, "%s: invalid link style '%s'\n", argv0, arg);
 			usage();
 		}
+		break;
+	case 'K':
+		cfg.keep_tracking = 1;
 		break;
 	case 'u':
 		cfg.unicode_tables = 1;
