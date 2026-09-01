@@ -33,10 +33,12 @@ static const char *strings_en[STR_COUNT] = {
 	[STR_LANG_AUTO]            = "System Default",
 	[STR_LANG_EN]              = "English",
 	[STR_LANG_ES]              = "Español (Spanish)",
-#ifdef __APPLE__
+#ifdef _WIN32
+	[STR_STARTUP]              = "Start with Windows",
+#elif defined(__APPLE__)
 	[STR_STARTUP]              = "Launch at Login",
 #else
-	[STR_STARTUP]              = "Start with Windows",
+	[STR_STARTUP]              = "Start on Login",
 #endif
 	[STR_PAUSE_15M]            = "Pause Formatting (15 Minutes)",
 	[STR_ABOUT_TITLE]          = "About ClipBridge",
@@ -84,10 +86,12 @@ static const char *strings_es[STR_COUNT] = {
 	[STR_LANG_AUTO]            = "Predeterminado del sistema",
 	[STR_LANG_EN]              = "English (Inglés)",
 	[STR_LANG_ES]              = "Español",
-#ifdef __APPLE__
+#ifdef _WIN32
+	[STR_STARTUP]              = "Iniciar con Windows",
+#elif defined(__APPLE__)
 	[STR_STARTUP]              = "Iniciar al iniciar sesión",
 #else
-	[STR_STARTUP]              = "Iniciar con Windows",
+	[STR_STARTUP]              = "Iniciar al iniciar sesión",
 #endif
 	[STR_PAUSE_15M]            = "Pausar formateo (15 minutos)",
 	[STR_ABOUT_TITLE]          = "Acerca de ClipBridge",

@@ -56,9 +56,9 @@ init_win32_clipboard(void)
 	}
 }
 
-/* Check if clipboard content contains sensitive privacy flags (e.g. from password managers) */
+/* Check if open clipboard content contains sensitive privacy flags (e.g. from password managers) */
 static int
-is_clipboard_ignored(void)
+is_clipboard_ignored_open(void)
 {
 	init_win32_clipboard();
 
@@ -105,14 +105,16 @@ clipboard_read_html(char **out_html, size_t *out_len)
 	*out_html = NULL;
 	*out_len = 0;
 
-	if (is_clipboard_ignored())
-		return -1;
-
 	if (!IsClipboardFormatAvailable(cf_html))
 		return -1;
 
 	if (!OpenClipboard(NULL))
 		return -1;
+
+	if (is_clipboard_ignored_open()) {
+		CloseClipboard();
+		return -1;
+	}
 
 	hData = GetClipboardData(cf_html);
 	if (!hData) {

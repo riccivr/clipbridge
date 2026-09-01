@@ -15,12 +15,12 @@ When you paste into plain-text targets (Notepad, terminals, vim, code editors), 
 
 How clipbridge Works
 --------------------
-`clipbridge` listens for clipboard updates with native OS event hooks. When an application puts HTML on the clipboard, `clipbridge` runs the HTML through the `unipaste` engine and writes formatted plain text (tables, code blocks, lists, links) into the plain-text clipboard slot. It leaves the original HTML slot unchanged.
+`clipbridge` monitors clipboard updates using native OS event hooks on Windows and macOS, and lightweight background polling on Linux. When an application copies rich HTML, `clipbridge` runs the HTML through the `unipaste` engine and updates the plain-text clipboard slot with clean markdown, tables, and links.
 
 Features
 --------
 * **Self-contained engine**: In-tree vendored `unipaste` C99 parsing and formatting engine (`vendor/unipaste/`).
-* **Format preservation**: Leaves the rich HTML slot untouched while offering formatted plain text (`CF_UNICODETEXT` on Windows, `NSPasteboardTypeString` on macOS, `text/plain` on Linux).
+* **Format preservation**: Re-offers both rich HTML and formatted plain text simultaneously on Windows (`CF_UNICODETEXT` + `HTML Format`) and macOS (`NSPasteboardTypeString` + `NSPasteboardTypeHTML`). On Linux, updates the plain-text selection via `wl-copy`/`xclip`.
 * **Privacy protection**: Automatically skips clipboard updates marked private by password managers (`Clipboard Viewer Ignore`, `CanIncludeInClipboardHistory`, `CanUploadToCloudStore`, `x-kde-passwordManagerHint`, and `org.nspasteboard.ConcealedType` from 1Password, Bitwarden, KeePassXC, and Apple Keychain).
 * **Platform backends**:
   * **Windows**: Native pure Win32 API (`AddClipboardFormatListener`, tray icon, registry persistence, hotkeys, 0 external dependencies).

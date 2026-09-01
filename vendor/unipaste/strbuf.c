@@ -16,8 +16,9 @@ strbuf_init(struct strbuf *sb, size_t initial_cap)
 
 	sb->data = malloc(initial_cap);
 	if (!sb->data) {
-		fprintf(stderr, "unipaste: memory allocation failed\n");
-		exit(1);
+		sb->len = 0;
+		sb->cap = 0;
+		return;
 	}
 	sb->data[0] = '\0';
 	sb->len = 0;
@@ -56,8 +57,7 @@ strbuf_grow(struct strbuf *sb, size_t needed)
 
 	/* Prevent size_t integer overflow */
 	if (needed > (SIZE_MAX - sb->len - 1)) {
-		fprintf(stderr, "unipaste: buffer size overflow\n");
-		exit(1);
+		return;
 	}
 
 	min_cap = sb->len + needed + 1;
@@ -74,8 +74,7 @@ strbuf_grow(struct strbuf *sb, size_t needed)
 
 	new_data = realloc(sb->data, new_cap);
 	if (!new_data) {
-		fprintf(stderr, "unipaste: memory allocation failed\n");
-		exit(1);
+		return;
 	}
 	sb->data = new_data;
 	sb->cap = new_cap;
@@ -84,11 +83,13 @@ strbuf_grow(struct strbuf *sb, size_t needed)
 void
 strbuf_putc(struct strbuf *sb, char c)
 {
-	if (!sb)
+	if (!sb || !sb->data)
 		return;
 	strbuf_grow(sb, 1);
-	sb->data[sb->len++] = c;
-	sb->data[sb->len] = '\0';
+	if (sb->len + 1 < sb->cap) {
+		sb->data[sb->len++] = c;
+		sb->data[sb->len] = '\0';
+	}
 }
 
 void
@@ -96,22 +97,26 @@ strbuf_puts(struct strbuf *sb, const char *s)
 {
 	size_t slen;
 
-	if (!sb || !s || !*s)
+	if (!sb || !sb->data || !s || !*s)
 		return;
 	slen = strlen(s);
 	strbuf_grow(sb, slen);
-	memcpy(sb->data + sb->len, s, slen);
-	sb->len += slen;
-	sb->data[sb->len] = '\0';
+	if (sb->len + slen < sb->cap) {
+		memcpy(sb->data + sb->len, s, slen);
+		sb->len += slen;
+		sb->data[sb->len] = '\0';
+	}
 }
 
 void
 strbuf_append(struct strbuf *sb, const char *data, size_t len)
 {
-	if (!sb || !data || len == 0)
+	if (!sb || !sb->data || !data || len == 0)
 		return;
 	strbuf_grow(sb, len);
-	memcpy(sb->data + sb->len, data, len);
-	sb->len += len;
-	sb->data[sb->len] = '\0';
+	if (sb->len + len < sb->cap) {
+		memcpy(sb->data + sb->len, data, len);
+		sb->len += len;
+		sb->data[sb->len] = '\0';
+	}
 }

@@ -15,6 +15,7 @@
 static struct config current_cfg;
 static BOOL auto_format_default = NO;
 static NSInteger last_change = 0;
+static NSDate *pause_until_date = nil;
 
 /* Check if clipboard is marked concealed/private by password managers */
 static int
@@ -65,21 +66,37 @@ clipboard_read_html(char **out_html, size_t *out_len)
 }
 
 int
-clipboard_write_text(const char *text, size_t len)
+clipboard_write_text_and_preserve_html(const char *text, size_t text_len, const char *orig_html, size_t html_len)
 {
-	if (!text || len == 0)
+	if (!text || text_len == 0)
 		return 0;
 
 	@autoreleasepool {
 		NSPasteboard *pboard = [NSPasteboard generalPasteboard];
-		NSString *str = [[NSString alloc] initWithBytes:text length:len encoding:NSUTF8StringEncoding];
+		NSString *str = [[NSString alloc] initWithBytes:text length:text_len encoding:NSUTF8StringEncoding];
 		if (!str)
 			return -1;
+
+		if (orig_html && html_len > 0) {
+			NSString *htmlStr = [[NSString alloc] initWithBytes:orig_html length:html_len encoding:NSUTF8StringEncoding];
+			if (htmlStr) {
+				[pboard declareTypes:@[NSPasteboardTypeHTML, NSPasteboardTypeString] owner:nil];
+				[pboard setString:htmlStr forType:NSPasteboardTypeHTML];
+				[pboard setString:str forType:NSPasteboardTypeString];
+				return 0;
+			}
+		}
 
 		/* Update plain-text representation */
 		[pboard setString:str forType:NSPasteboardTypeString];
 		return 0;
 	}
+}
+
+int
+clipboard_write_text(const char *text, size_t len)
+{
+	return clipboard_write_text_and_preserve_html(text, len, NULL, 0);
 }
 
 static int
@@ -91,7 +108,7 @@ process_html_to_clipboard(const char *html, size_t len, const struct config *cfg
 	strbuf_init(&sb, len * 2);
 	ret = unipaste_process_to_strbuf(html, len, &sb, cfg);
 	if (ret == 0 && sb.len > 0) {
-		clipboard_write_text(sb.data, sb.len);
+		clipboard_write_text_and_preserve_html(sb.data, sb.len, html, len);
 	}
 	strbuf_free(&sb);
 	return ret;
@@ -304,6 +321,14 @@ create_status_bar_template_icon(void)
 	[self.autoFormatItem setState:(auto_format_default ? NSControlStateValueOn : NSControlStateValueOff)];
 	[menu addItem:self.autoFormatItem];
 
+	/* Pause 15 Minutes */
+	BOOL isPaused = (pause_until_date && [pause_until_date timeIntervalSinceNow] > 0);
+	NSString *pauseTitle = [NSString stringWithUTF8String:i18n_get(STR_PAUSE_15M)];
+	NSMenuItem *pauseItem = [[NSMenuItem alloc] initWithTitle:pauseTitle action:@selector(togglePause15M:) keyEquivalent:@""];
+	[pauseItem setTarget:self];
+	[pauseItem setState:(isPaused ? NSControlStateValueOn : NSControlStateValueOff)];
+	[menu addItem:pauseItem];
+
 	/* Strip Tracking */
 	NSString *trackTitle = [NSString stringWithUTF8String:i18n_get(STR_STRIP_TRACKING)];
 	NSMenuItem *trackItem = [[NSMenuItem alloc] initWithTitle:trackTitle action:@selector(toggleStripTracking:) keyEquivalent:@""];
@@ -428,6 +453,9 @@ create_status_bar_template_icon(void)
 	if (!auto_format_default)
 		return;
 
+	if (pause_until_date && [pause_until_date timeIntervalSinceNow] > 0)
+		return;
+
 	@autoreleasepool {
 		NSPasteboard *pboard = [NSPasteboard generalPasteboard];
 		NSInteger cur_change = [pboard changeCount];
@@ -452,6 +480,16 @@ create_status_bar_template_icon(void)
 - (void)toggleAutoFormat:(id)sender {
 	(void)sender;
 	auto_format_default = !auto_format_default;
+	[self buildMenu];
+}
+
+- (void)togglePause15M:(id)sender {
+	(void)sender;
+	if (pause_until_date && [pause_until_date timeIntervalSinceNow] > 0) {
+		pause_until_date = nil;
+	} else {
+		pause_until_date = [NSDate dateWithTimeIntervalSinceNow:(15 * 60)];
+	}
 	[self buildMenu];
 }
 

@@ -78,6 +78,33 @@ test_not_contains "Security: Script stripped" "$SCRIPT_ATTACK" "alert" "-p -m ma
 RAW_TSV=$(printf "Col1\tCol2\tCol3\nVal1\tVal2\tVal3\n")
 test_contains "TSV: Grid conversion" "$RAW_TSV" "| Col1 | Col2 | Col3 |" "-p -m markdown"
 
+# Test 10: Live clipboard synchronization test (if display is active)
+if [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy >/dev/null 2>&1 && command -v wl-paste >/dev/null 2>&1; then
+	printf "<b>Live</b>" | wl-copy -t text/html
+	$EXE -1 -m markdown
+	TEXT_OUT=$(wl-paste -t text/plain 2>/dev/null || true)
+	if [ "$TEXT_OUT" = "**Live**" ]; then
+		printf "[PASS] Live Clipboard (Wayland): Formatted plain text updated\n"
+		PASSED=$((PASSED + 1))
+	else
+		printf "[FAIL] Live Clipboard (Wayland): Expected '**Live**', got '%s'\n" "$TEXT_OUT"
+		FAILED=$((FAILED + 1))
+	fi
+elif [ -n "$DISPLAY" ] && command -v xclip >/dev/null 2>&1; then
+	printf "<b>Live</b>" | xclip -selection clipboard -t text/html
+	$EXE -1 -m markdown
+	TEXT_OUT=$(xclip -selection clipboard -o 2>/dev/null || true)
+	if [ "$TEXT_OUT" = "**Live**" ]; then
+		printf "[PASS] Live Clipboard (X11): Formatted plain text updated\n"
+		PASSED=$((PASSED + 1))
+	else
+		printf "[FAIL] Live Clipboard (X11): Expected '**Live**', got '%s'\n" "$TEXT_OUT"
+		FAILED=$((FAILED + 1))
+	fi
+else
+	printf "[SKIP] Live Clipboard test: No active GUI/display session detected in this test run\n"
+fi
+
 echo ""
 echo "======================================"
 echo "Results: $PASSED passed, $FAILED failed"

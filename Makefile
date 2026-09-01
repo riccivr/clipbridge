@@ -62,6 +62,7 @@ clean:
 dist: clean
 	mkdir -p clipbridge-$(VERSION)/scripts clipbridge-$(VERSION)/packaging clipbridge-$(VERSION)/assets clipbridge-$(VERSION)/vendor/unipaste clipbridge-$(VERSION)/tests
 	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.rc installer.rc clipbridge.1 arg.h clipbridge.h i18n.h clipbridge.c i18n.c installer_win32.c platform_posix.c platform_win32.c platform_macos.m scripts packaging assets vendor tests clipbridge-$(VERSION)
+	rm -rf clipbridge-$(VERSION)/packaging/aur
 	tar -cf clipbridge-$(VERSION).tar clipbridge-$(VERSION)
 	gzip clipbridge-$(VERSION).tar
 	rm -rf clipbridge-$(VERSION)
