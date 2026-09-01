@@ -934,25 +934,56 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 	}
 }
 
-/* Locate StartFragment / EndFragment if present in Windows CF_HTML */
-static const char *
-find_fragment_start(const char *src)
+/* Strip Windows CF_HTML clipboard headers (Version:..., StartHTML:..., StartFragment:...) */
+static void
+strip_windows_cf_html_header(const char **input_ptr, size_t *len_ptr)
 {
-	const char *marker = "<!--StartFragment-->";
-	const char *p = strstr(src, marker);
-	if (p)
-		return p + strlen(marker);
-	return src;
-}
+	const char *input = *input_ptr;
+	size_t len = *len_ptr;
 
-static size_t
-find_fragment_len(const char *src, size_t total_len)
-{
-	const char *marker = "<!--EndFragment-->";
-	const char *p = strstr(src, marker);
-	if (p && p >= src)
-		return (size_t)(p - src);
-	return total_len;
+	if (!input || len == 0)
+		return;
+
+	/* Check if input begins with Windows CF_HTML header */
+	if (len >= 8 && (ci_n_equal(input, "Version:", 8) || ci_n_equal(input, "version:", 8))) {
+		const char *sf = strstr(input, "StartFragment:");
+		const char *ef = strstr(input, "EndFragment:");
+		if (sf && ef) {
+			long start_offset = atol(sf + 14);
+			long end_offset = atol(ef + 12);
+			if (start_offset > 0 && start_offset < (long)len && end_offset > start_offset && end_offset <= (long)len) {
+				input = input + start_offset;
+				len = (size_t)(end_offset - start_offset);
+				*input_ptr = input;
+				*len_ptr = len;
+				return;
+			}
+		}
+
+		/* If numeric offsets were omitted or invalid, skip past header lines to first '<' */
+		const char *first_tag = strchr(input, '<');
+		if (first_tag && first_tag < input + len) {
+			len -= (size_t)(first_tag - input);
+			input = first_tag;
+			*input_ptr = input;
+			*len_ptr = len;
+		}
+	}
+
+	/* Also check for fragment comment markers <!--StartFragment--> ... <!--EndFragment--> */
+	const char *frag_start = strstr(input, "<!--StartFragment-->");
+	if (frag_start && frag_start < input + len) {
+		frag_start += strlen("<!--StartFragment-->");
+		const char *frag_end = strstr(frag_start, "<!--EndFragment-->");
+		if (frag_end && frag_end <= input + len) {
+			len = (size_t)(frag_end - frag_start);
+		} else {
+			len -= (size_t)(frag_start - input);
+		}
+		input = frag_start;
+		*input_ptr = input;
+		*len_ptr = len;
+	}
 }
 
 /* Check if raw plain text input is a TSV (tab-separated) spreadsheet grid */
@@ -1065,6 +1096,9 @@ unipaste_process_to_strbuf(const char *input, size_t len, struct strbuf *out, co
 	if (!input || !out || !cfg)
 		return 1;
 
+	/* Strip Windows CF_HTML clipboard headers if present */
+	strip_windows_cf_html_header(&input, &len);
+
 	/* Auto-detect raw TSV grids from Excel / Google Sheets */
 	if (is_tsv_grid(input, len)) {
 		return process_tsv_to_strbuf(input, len, out, cfg);
@@ -1098,11 +1132,7 @@ unipaste_process_to_strbuf(const char *input, size_t len, struct strbuf *out, co
 	strbuf_init(&st.heading_text, 256);
 	strbuf_init(&st.math_text, 256);
 
-	/* Check for Windows CF_HTML fragments */
-	p = find_fragment_start(input);
-	if (p != input) {
-		len = find_fragment_len(p, len - (p - input));
-	}
+	p = input;
 	end = p + len;
 
 	while (p < end && *p) {

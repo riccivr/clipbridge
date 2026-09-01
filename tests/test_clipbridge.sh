@@ -78,7 +78,13 @@ test_not_contains "Security: Script stripped" "$SCRIPT_ATTACK" "alert" "-p -m ma
 RAW_TSV=$(printf "Col1\tCol2\tCol3\nVal1\tVal2\tVal3\n")
 test_contains "TSV: Grid conversion" "$RAW_TSV" "| Col1 | Col2 | Col3 |" "-p -m markdown"
 
-# Test 10: Live clipboard synchronization test (if display is active)
+# Test 10: Windows CF_HTML header stripping
+CF_HTML_RAW=$(printf "Version:0.9\r\nStartHTML:0000000105\r\nEndHTML:0000008959\r\nStartFragment:0000000141\r\nEndFragment:0000008923\r\n<html><body><!--StartFragment--><h1>Clean Title</h1><p>Paragraph content</p><!--EndFragment--></body></html>")
+test_contains "CF_HTML: Content parsed" "$CF_HTML_RAW" "# Clean Title" "-p -m markdown"
+test_not_contains "CF_HTML: Header Version stripped" "$CF_HTML_RAW" "Version:0.9" "-p -m markdown"
+test_not_contains "CF_HTML: Header StartFragment stripped" "$CF_HTML_RAW" "StartFragment" "-p -m markdown"
+
+# Test 11: Live clipboard synchronization test (if display is active)
 if [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy >/dev/null 2>&1 && command -v wl-paste >/dev/null 2>&1; then
 	printf "<b>Live</b>" | wl-copy -t text/html
 	$EXE -1 -m markdown
