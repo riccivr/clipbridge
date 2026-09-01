@@ -21,6 +21,45 @@ sig_handler(int sig)
 	running = 0;
 }
 
+/* Check if clipboard is marked private/concealed by password managers on Linux */
+static int
+is_posix_clipboard_ignored(void)
+{
+	FILE *fp;
+	char line[256];
+	int ignored = 0;
+
+	if (getenv("WAYLAND_DISPLAY")) {
+		fp = popen("wl-paste --list-types 2>/dev/null", "r");
+		if (fp) {
+			while (fgets(line, sizeof(line), fp)) {
+				if (strstr(line, "password") || strstr(line, "Password") ||
+				    strstr(line, "1password") || strstr(line, "keepass") ||
+				    strstr(line, "concealed") || strstr(line, "x-kde-passwordManagerHint")) {
+					ignored = 1;
+					break;
+				}
+			}
+			pclose(fp);
+		}
+	} else {
+		fp = popen("xclip -selection clipboard -t TARGETS -o 2>/dev/null", "r");
+		if (fp) {
+			while (fgets(line, sizeof(line), fp)) {
+				if (strstr(line, "password") || strstr(line, "Password") ||
+				    strstr(line, "1password") || strstr(line, "keepass") ||
+				    strstr(line, "concealed") || strstr(line, "x-kde-passwordManagerHint")) {
+					ignored = 1;
+					break;
+				}
+			}
+			pclose(fp);
+		}
+	}
+
+	return ignored;
+}
+
 /* Determine the available clipboard read command for HTML */
 static const char *
 get_read_html_cmd(void)
@@ -53,6 +92,9 @@ clipboard_read_html(char **out_html, size_t *out_len)
 	*out_html = NULL;
 	*out_len = 0;
 
+	if (is_posix_clipboard_ignored())
+		return -1;
+
 	cmd = get_read_html_cmd();
 	fp = popen(cmd, "r");
 	if (!fp)
@@ -61,11 +103,14 @@ clipboard_read_html(char **out_html, size_t *out_len)
 	strbuf_init(&sb, 4096);
 	while ((n = fread(buf, 1, sizeof(buf), fp)) > 0) {
 		strbuf_append(&sb, buf, n);
+		if (sb.len > 10 * 1024 * 1024) { /* Cap at 10 MB */
+			break;
+		}
 	}
 
 	pclose(fp);
 
-	if (sb.len == 0) {
+	if (sb.len == 0 || sb.len > 10 * 1024 * 1024) {
 		strbuf_free(&sb);
 		return -1;
 	}
@@ -167,8 +212,8 @@ clipboard_watch(const struct config *cfg)
 	struct sigaction sa;
 	int lock_fd;
 
-	/* Singleton check on POSIX */
-	lock_fd = open("/tmp/clipbridge.lock", O_RDWR | O_CREAT, 0666);
+	/* Singleton check on POSIX with secure 0600 permissions */
+	lock_fd = open("/tmp/clipbridge.lock", O_RDWR | O_CREAT, 0600);
 	if (lock_fd >= 0) {
 		if (flock(lock_fd, LOCK_EX | LOCK_NB) != 0) {
 			fprintf(stderr, "clipbridge: another instance is already running.\n");
@@ -216,6 +261,8 @@ clipboard_watch(const struct config *cfg)
 	}
 
 	free(last_html);
+	if (lock_fd >= 0)
+		close(lock_fd);
 	printf("\nclipbridge: stopped cleanly.\n");
 	return 0;
 }

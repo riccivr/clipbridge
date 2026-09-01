@@ -256,7 +256,7 @@ perform_windows_uninstallation(HINSTANCE hInstance)
 	/* 7. Remove AppData directory */
 	wchar_t localAppData[MAX_PATH * 2];
 	if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
-		wchar_t appDir[MAX_PATH * 2];
+		wchar_t appDir[MAX_PATH];
 		_snwprintf(appDir, sizeof(appDir) / sizeof(wchar_t), L"%ls\\ClipBridge", localAppData);
 		wchar_t exePath[MAX_PATH * 2];
 		_snwprintf(exePath, sizeof(exePath) / sizeof(wchar_t), L"%ls\\clipbridge.exe", appDir);
@@ -264,7 +264,7 @@ perform_windows_uninstallation(HINSTANCE hInstance)
 		RemoveDirectoryW(appDir);
 
 		/* Background fallback self-delete */
-		char cmd[MAX_PATH * 3];
+		char cmd[MAX_PATH * 4];
 		snprintf(cmd, sizeof(cmd), "/C ping 127.0.0.1 -n 2 > nul & rd /S /Q \"%ls\"", appDir);
 		ShellExecuteA(NULL, "open", "cmd.exe", cmd, NULL, SW_HIDE);
 	}

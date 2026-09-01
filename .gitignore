@@ -1,5 +1,5 @@
 clipbridge
-clipbridge.exe
+*.exe
 *.o
 *.tar.gz
 *.zip

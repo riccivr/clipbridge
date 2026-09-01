@@ -81,9 +81,9 @@ perform_uninstall(void)
 	RegDeleteKeyW(HKEY_CURRENT_USER, L"Software\\ClipBridge");
 
 	if (SUCCEEDED(SHGetFolderPathW(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, localAppData))) {
-		wchar_t appDir[MAX_PATH * 2];
+		wchar_t appDir[MAX_PATH];
 		_snwprintf(appDir, sizeof(appDir) / sizeof(wchar_t), L"%ls\\ClipBridge", localAppData);
-		char cmd[MAX_PATH * 3];
+		char cmd[MAX_PATH * 4];
 		snprintf(cmd, sizeof(cmd), "/C ping 127.0.0.1 -n 2 > nul & rd /S /Q \"%ls\"", appDir);
 		ShellExecuteA(NULL, "open", "cmd.exe", cmd, NULL, SW_HIDE);
 	}
@@ -96,11 +96,11 @@ static int
 perform_uninstall(void)
 {
 	printf("Uninstalling ClipBridge on macOS...\n");
-	system("launchctl unload ~/Library/LaunchAgents/com.riccivr.clipbridge.plist 2>/dev/null || true");
-	system("rm -f ~/Library/LaunchAgents/com.riccivr.clipbridge.plist");
-	system("defaults delete com.riccivr.clipbridge 2>/dev/null || true");
-	system("rm -rf ~/Library/Preferences/com.riccivr.clipbridge.plist");
-	system("rm -rf /Applications/ClipBridge.app 2>/dev/null || true");
+	if (system("launchctl unload ~/Library/LaunchAgents/com.riccivr.clipbridge.plist 2>/dev/null || true") != 0) {}
+	if (system("rm -f ~/Library/LaunchAgents/com.riccivr.clipbridge.plist") != 0) {}
+	if (system("defaults delete com.riccivr.clipbridge 2>/dev/null || true") != 0) {}
+	if (system("rm -rf ~/Library/Preferences/com.riccivr.clipbridge.plist") != 0) {}
+	if (system("rm -rf /Applications/ClipBridge.app 2>/dev/null || true") != 0) {}
 	printf("ClipBridge uninstalled successfully.\n");
 	return 0;
 }
@@ -109,13 +109,13 @@ static int
 perform_uninstall(void)
 {
 	printf("Uninstalling ClipBridge on Linux...\n");
-	system("systemctl --user stop clipbridge.service 2>/dev/null || true");
-	system("systemctl --user disable clipbridge.service 2>/dev/null || true");
-	system("rm -f ~/.config/systemd/user/clipbridge.service");
-	system("rm -f ~/.local/share/applications/clipbridge.desktop");
-	system("rm -f ~/.local/share/icons/hicolor/scalable/apps/clipbridge.svg");
-	system("rm -f ~/.local/share/pixmaps/clipbridge.png");
-	system("rm -rf ~/.config/clipbridge");
+	if (system("systemctl --user stop clipbridge.service 2>/dev/null || true") != 0) {}
+	if (system("systemctl --user disable clipbridge.service 2>/dev/null || true") != 0) {}
+	if (system("rm -f ~/.config/systemd/user/clipbridge.service") != 0) {}
+	if (system("rm -f ~/.local/share/applications/clipbridge.desktop") != 0) {}
+	if (system("rm -f ~/.local/share/icons/hicolor/scalable/apps/clipbridge.svg") != 0) {}
+	if (system("rm -f ~/.local/share/pixmaps/clipbridge.png") != 0) {}
+	if (system("rm -rf ~/.config/clipbridge") != 0) {}
 	printf("ClipBridge desktop shortcuts and user configuration uninstalled.\n");
 	return 0;
 }
@@ -225,10 +225,33 @@ main(int argc, char *argv[])
 		usage();
 	} ARGEND
 
+	if (argc > 0) {
+		int status = 0;
+		for (int i = 0; i < argc; i++) {
+			if (strcmp(argv[i], "-") == 0) {
+				if (unipaste_process_stream(stdin, stdout, &cfg) != 0)
+					status = 1;
+			} else {
+				FILE *f = fopen(argv[i], "rb");
+				if (!f) {
+					fprintf(stderr, "%s: cannot open '%s'\n", argv0, argv[i]);
+					status = 1;
+					continue;
+				}
+				if (unipaste_process_stream(f, stdout, &cfg) != 0)
+					status = 1;
+				fclose(f);
+			}
+		}
+		return status;
+	}
+
 	switch (action) {
 	case ACTION_ONCE:
 		return clipboard_sync_once(&cfg);
 	case ACTION_PASTE:
+		if (!isatty(fileno(stdin)))
+			return unipaste_process_stream(stdin, stdout, &cfg);
 		return clipboard_paste_stdout(&cfg);
 	case ACTION_PASTE_ACTIVE:
 		return clipboard_paste_active(&cfg);

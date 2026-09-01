@@ -65,6 +65,32 @@ is_clipboard_ignored(void)
 	if (cf_ignore && IsClipboardFormatAvailable(cf_ignore))
 		return 1;
 
+	if (cf_no_history && IsClipboardFormatAvailable(cf_no_history)) {
+		HANDLE h = GetClipboardData(cf_no_history);
+		if (h) {
+			DWORD *val = (DWORD *)GlobalLock(h);
+			if (val) {
+				DWORD d = *val;
+				GlobalUnlock(h);
+				if (d == 0)
+					return 1;
+			}
+		}
+	}
+
+	if (cf_no_cloud && IsClipboardFormatAvailable(cf_no_cloud)) {
+		HANDLE h = GetClipboardData(cf_no_cloud);
+		if (h) {
+			DWORD *val = (DWORD *)GlobalLock(h);
+			if (val) {
+				DWORD d = *val;
+				GlobalUnlock(h);
+				if (d == 0)
+					return 1;
+			}
+		}
+	}
+
 	return 0;
 }
 
@@ -73,7 +99,7 @@ clipboard_read_html(char **out_html, size_t *out_len)
 {
 	HANDLE hData;
 	char *data;
-	size_t len;
+	size_t raw_sz, len;
 
 	init_win32_clipboard();
 	*out_html = NULL;
@@ -94,16 +120,32 @@ clipboard_read_html(char **out_html, size_t *out_len)
 		return -1;
 	}
 
+	raw_sz = (size_t)GlobalSize(hData);
+	if (raw_sz == 0) {
+		CloseClipboard();
+		return -1;
+	}
+
 	data = (char *)GlobalLock(hData);
 	if (!data) {
 		CloseClipboard();
 		return -1;
 	}
 
-	len = strlen(data);
+	len = 0;
+	while (len < raw_sz && data[len] != '\0')
+		len++;
+
+	if (len == 0 || len > 20 * 1024 * 1024) { /* Cap at 20 MB */
+		GlobalUnlock(hData);
+		CloseClipboard();
+		return -1;
+	}
+
 	*out_html = malloc(len + 1);
 	if (*out_html) {
-		memcpy(*out_html, data, len + 1);
+		memcpy(*out_html, data, len);
+		(*out_html)[len] = '\0';
 		*out_len = len;
 	}
 
@@ -114,46 +156,76 @@ clipboard_read_html(char **out_html, size_t *out_len)
 }
 
 int
-clipboard_write_text(const char *text, size_t len)
+clipboard_write_text_and_preserve_html(const char *text, size_t text_len, const char *orig_html, size_t html_len)
 {
 	int wlen;
 	wchar_t *wstr;
-	HGLOBAL hMem;
-	void *pMem;
+	HGLOBAL hTextMem = NULL;
+	HGLOBAL hHtmlMem = NULL;
+	void *pTextMem = NULL;
+	void *pHtmlMem = NULL;
 
-	if (!text || len == 0)
+	if (!text || text_len == 0)
 		return 0;
 
 	/* Convert UTF-8 to UTF-16 for CF_UNICODETEXT */
-	wlen = MultiByteToWideChar(CP_UTF8, 0, text, (int)len, NULL, 0);
+	wlen = MultiByteToWideChar(CP_UTF8, 0, text, (int)text_len, NULL, 0);
 	if (wlen <= 0)
 		return -1;
 
-	hMem = GlobalAlloc(GMEM_MOVEABLE, (wlen + 1) * sizeof(wchar_t));
-	if (!hMem)
+	hTextMem = GlobalAlloc(GMEM_MOVEABLE, (wlen + 1) * sizeof(wchar_t));
+	if (!hTextMem)
 		return -1;
 
-	pMem = GlobalLock(hMem);
-	if (!pMem) {
-		GlobalFree(hMem);
+	pTextMem = GlobalLock(hTextMem);
+	if (!pTextMem) {
+		GlobalFree(hTextMem);
 		return -1;
 	}
 
-	wstr = (wchar_t *)pMem;
-	MultiByteToWideChar(CP_UTF8, 0, text, (int)len, wstr, wlen);
+	wstr = (wchar_t *)pTextMem;
+	MultiByteToWideChar(CP_UTF8, 0, text, (int)text_len, wstr, wlen);
 	wstr[wlen] = L'\0';
-	GlobalUnlock(hMem);
+	GlobalUnlock(hTextMem);
 
-	if (!OpenClipboard(NULL)) {
-		GlobalFree(hMem);
+	/* Prepare HTML Format copy to re-offer */
+	if (orig_html && html_len > 0) {
+		hHtmlMem = GlobalAlloc(GMEM_MOVEABLE, html_len + 1);
+		if (hHtmlMem) {
+			pHtmlMem = GlobalLock(hHtmlMem);
+			if (pHtmlMem) {
+				memcpy(pHtmlMem, orig_html, html_len);
+				((char *)pHtmlMem)[html_len] = '\0';
+				GlobalUnlock(hHtmlMem);
+			} else {
+				GlobalFree(hHtmlMem);
+				hHtmlMem = NULL;
+			}
+		}
+	}
+
+	if (!OpenClipboard(g_hwnd)) {
+		GlobalFree(hTextMem);
+		if (hHtmlMem) GlobalFree(hHtmlMem);
 		return -1;
 	}
 
-	/* Update Unicode Plaintext on Clipboard */
-	SetClipboardData(CF_UNICODETEXT, hMem);
-	CloseClipboard();
+	/* EmptyClipboard takes ownership */
+	EmptyClipboard();
 
+	if (hHtmlMem && cf_html) {
+		SetClipboardData(cf_html, hHtmlMem);
+	}
+	SetClipboardData(CF_UNICODETEXT, hTextMem);
+
+	CloseClipboard();
 	return 0;
+}
+
+int
+clipboard_write_text(const char *text, size_t len)
+{
+	return clipboard_write_text_and_preserve_html(text, len, NULL, 0);
 }
 
 static int
@@ -165,7 +237,7 @@ process_html_to_clipboard(const char *html, size_t len, const struct config *cfg
 	strbuf_init(&sb, len * 2);
 	ret = unipaste_process_to_strbuf(html, len, &sb, cfg);
 	if (ret == 0 && sb.len > 0) {
-		clipboard_write_text(sb.data, sb.len);
+		clipboard_write_text_and_preserve_html(sb.data, sb.len, html, len);
 	}
 	strbuf_free(&sb);
 	return ret;
@@ -285,6 +357,52 @@ set_startup_enabled(int enable)
 }
 
 static void
+save_settings(void)
+{
+	HKEY hKey;
+	if (RegCreateKeyExA(HKEY_CURRENT_USER, "Software\\ClipBridge\\Settings", 0, NULL, 0, KEY_SET_VALUE, NULL, &hKey, NULL) == ERROR_SUCCESS) {
+		DWORD mode = (DWORD)current_cfg.mode;
+		DWORD table_style = (DWORD)current_cfg.table_style;
+		DWORD unicode_tables = (DWORD)current_cfg.unicode_tables;
+		DWORD keep_tracking = (DWORD)current_cfg.keep_tracking;
+		DWORD auto_fmt = (DWORD)auto_format_default;
+
+		RegSetValueExA(hKey, "Mode", 0, REG_DWORD, (const BYTE *)&mode, sizeof(mode));
+		RegSetValueExA(hKey, "TableStyle", 0, REG_DWORD, (const BYTE *)&table_style, sizeof(table_style));
+		RegSetValueExA(hKey, "UnicodeTables", 0, REG_DWORD, (const BYTE *)&unicode_tables, sizeof(unicode_tables));
+		RegSetValueExA(hKey, "KeepTracking", 0, REG_DWORD, (const BYTE *)&keep_tracking, sizeof(keep_tracking));
+		RegSetValueExA(hKey, "AutoFormat", 0, REG_DWORD, (const BYTE *)&auto_fmt, sizeof(auto_fmt));
+		RegCloseKey(hKey);
+	}
+}
+
+static void
+load_settings(void)
+{
+	HKEY hKey;
+	if (RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\ClipBridge\\Settings", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+		DWORD val = 0, sz = sizeof(val), type = 0;
+
+		if (RegQueryValueExA(hKey, "Mode", NULL, &type, (LPBYTE)&val, &sz) == ERROR_SUCCESS)
+			current_cfg.mode = (enum output_mode)val;
+		sz = sizeof(val);
+		if (RegQueryValueExA(hKey, "TableStyle", NULL, &type, (LPBYTE)&val, &sz) == ERROR_SUCCESS)
+			current_cfg.table_style = (enum table_style)val;
+		sz = sizeof(val);
+		if (RegQueryValueExA(hKey, "UnicodeTables", NULL, &type, (LPBYTE)&val, &sz) == ERROR_SUCCESS)
+			current_cfg.unicode_tables = (int)val;
+		sz = sizeof(val);
+		if (RegQueryValueExA(hKey, "KeepTracking", NULL, &type, (LPBYTE)&val, &sz) == ERROR_SUCCESS)
+			current_cfg.keep_tracking = (int)val;
+		sz = sizeof(val);
+		if (RegQueryValueExA(hKey, "AutoFormat", NULL, &type, (LPBYTE)&val, &sz) == ERROR_SUCCESS)
+			auto_format_default = (int)val;
+
+		RegCloseKey(hKey);
+	}
+}
+
+static void
 save_language_preference(enum lang_id lang)
 {
 	HKEY hKey;
@@ -340,6 +458,7 @@ static void
 show_tray_menu(HWND hwnd)
 {
 	POINT pt;
+	int is_paused;
 	HMENU hMenu = CreatePopupMenu();
 	HMENU hModeMenu = CreatePopupMenu();
 	HMENU hTableMenu = CreatePopupMenu();
@@ -347,12 +466,15 @@ show_tray_menu(HWND hwnd)
 
 	GetCursorPos(&pt);
 
+	is_paused = (pause_until_tick && GetTickCount() < pause_until_tick);
+
 	/* Instant Paste Action */
 	append_menu_u8(hMenu, MF_STRING, ID_TRAY_PASTE_NOW, i18n_get(STR_PASTE_ACTIVE));
 	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
 
-	/* Auto-format default toggle */
+	/* Auto-format default toggle and 15M Pause */
 	append_menu_u8(hMenu, (auto_format_default ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_AUTO_FORMAT, i18n_get(STR_AUTO_FORMAT));
+	append_menu_u8(hMenu, (is_paused ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_PAUSE_15M, i18n_get(STR_PAUSE_15M));
 	append_menu_u8(hMenu, (!current_cfg.keep_tracking ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_STRIP_TRACKING, i18n_get(STR_STRIP_TRACKING));
 	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
 
@@ -445,39 +567,57 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			break;
 		case ID_TRAY_AUTO_FORMAT:
 			auto_format_default = !auto_format_default;
+			save_settings();
 			update_tray_tooltip();
+			break;
+		case ID_TRAY_PAUSE_15M:
+			if (pause_until_tick && GetTickCount() < pause_until_tick) {
+				pause_until_tick = 0;
+			} else {
+				pause_until_tick = GetTickCount() + (15 * 60 * 1000);
+			}
 			break;
 		case ID_TRAY_STRIP_TRACKING:
 			current_cfg.keep_tracking = !current_cfg.keep_tracking;
+			save_settings();
 			break;
 		case ID_TRAY_MODE_PLAIN:
 			current_cfg.mode = MODE_PLAIN;
+			save_settings();
 			break;
 		case ID_TRAY_MODE_MARKDOWN:
 			current_cfg.mode = MODE_MARKDOWN;
+			save_settings();
 			break;
 		case ID_TRAY_MODE_SLACK:
 			current_cfg.mode = MODE_SLACK;
+			save_settings();
 			break;
 		case ID_TRAY_MODE_JIRA:
 			current_cfg.mode = MODE_JIRA;
+			save_settings();
 			break;
 		case ID_TRAY_MODE_TERMINAL:
 			current_cfg.mode = MODE_TERMINAL;
+			save_settings();
 			break;
 		case ID_TRAY_TABLE_GRID:
 			current_cfg.table_style = TABLE_STYLE_GRID;
 			current_cfg.unicode_tables = 0;
+			save_settings();
 			break;
 		case ID_TRAY_TABLE_UNICODE:
 			current_cfg.table_style = TABLE_STYLE_GRID;
 			current_cfg.unicode_tables = 1;
+			save_settings();
 			break;
 		case ID_TRAY_TABLE_MARKDOWN:
 			current_cfg.table_style = TABLE_STYLE_MARKDOWN;
+			save_settings();
 			break;
 		case ID_TRAY_TABLE_TSV:
 			current_cfg.table_style = TABLE_STYLE_TSV;
+			save_settings();
 			break;
 		case ID_TRAY_LANG_AUTO:
 			i18n_set_language(LANG_AUTO);
@@ -537,7 +677,8 @@ clipboard_watch(const struct config *cfg)
 	}
 	current_cfg.crlf = 1;
 
-	/* Initialize i18n subsystem with saved user preference */
+	/* Load persisted user settings and language */
+	load_settings();
 	i18n_init(load_language_preference());
 
 	/* Singleton Enforcement: Allow only 1 running daemon instance */

@@ -33,7 +33,12 @@ static const char *strings_en[STR_COUNT] = {
 	[STR_LANG_AUTO]            = "System Default",
 	[STR_LANG_EN]              = "English",
 	[STR_LANG_ES]              = "Español (Spanish)",
+#ifdef __APPLE__
+	[STR_STARTUP]              = "Launch at Login",
+#else
 	[STR_STARTUP]              = "Start with Windows",
+#endif
+	[STR_PAUSE_15M]            = "Pause Formatting (15 Minutes)",
 	[STR_ABOUT_TITLE]          = "About ClipBridge",
 	[STR_ABOUT_MENU]           = "About ClipBridge...",
 	[STR_ABOUT_BODY]           = "ClipBridge - Universal Clipboard Daemon\n"
@@ -79,7 +84,12 @@ static const char *strings_es[STR_COUNT] = {
 	[STR_LANG_AUTO]            = "Predeterminado del sistema",
 	[STR_LANG_EN]              = "English (Inglés)",
 	[STR_LANG_ES]              = "Español",
+#ifdef __APPLE__
+	[STR_STARTUP]              = "Iniciar al iniciar sesión",
+#else
 	[STR_STARTUP]              = "Iniciar con Windows",
+#endif
+	[STR_PAUSE_15M]            = "Pausar formateo (15 minutos)",
 	[STR_ABOUT_TITLE]          = "Acerca de ClipBridge",
 	[STR_ABOUT_MENU]           = "Acerca de ClipBridge...",
 	[STR_ABOUT_BODY]           = "ClipBridge - Demonio universal de portapapeles\n"

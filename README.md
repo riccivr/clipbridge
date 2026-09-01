@@ -19,19 +19,19 @@ How clipbridge Works
 
 Features
 --------
-* Uses the `unipaste` C99 parsing and formatting engine.
-* Zero external runtime dependencies.
-* Leaves the rich HTML slot untouched while updating the plain-text slot.
-* Skips clipboard updates marked private by password managers (`Clipboard Viewer Ignore`, `CanIncludeInClipboardHistory`, and `org.nspasteboard.ConcealedType` from 1Password, Bitwarden, KeePassXC, and Apple Keychain).
-* Platform support:
-  * macOS: Native Cocoa/AppKit `NSPasteboard` changeCount tracking.
-  * Windows: Native Win32 `AddClipboardFormatListener` event loop.
-  * Linux (Wayland): Uses `wl-clipboard` (`wl-paste` and `wl-copy`).
-  * Linux (X11): Uses `xclip` or `xsel`.
-* Modes:
+* **Self-contained engine**: In-tree vendored `unipaste` C99 parsing and formatting engine (`vendor/unipaste/`).
+* **Format preservation**: Leaves the rich HTML slot untouched while offering formatted plain text (`CF_UNICODETEXT` on Windows, `NSPasteboardTypeString` on macOS, `text/plain` on Linux).
+* **Privacy protection**: Automatically skips clipboard updates marked private by password managers (`Clipboard Viewer Ignore`, `CanIncludeInClipboardHistory`, `CanUploadToCloudStore`, `x-kde-passwordManagerHint`, and `org.nspasteboard.ConcealedType` from 1Password, Bitwarden, KeePassXC, and Apple Keychain).
+* **Platform backends**:
+  * **Windows**: Native pure Win32 API (`AddClipboardFormatListener`, tray icon, registry persistence, hotkeys, 0 external dependencies).
+  * **macOS**: Native Cocoa/AppKit `NSPasteboard` changeCount tracking.
+  * **Linux (Wayland)**: Uses `wl-clipboard` (`wl-paste` and `wl-copy`).
+  * **Linux (X11)**: Uses `xclip` or `xsel`.
+* **Modes**:
   * Background daemon (`clipbridge -w`).
   * One-shot hotkey sync (`clipbridge -1`).
-  * Direct terminal paste (`clipbridge -p`).
+  * Direct terminal paste or stream filter (`clipbridge -p`).
+  * Active window paste simulation (`clipbridge -k`).
 
 Build and Install
 -----------------
@@ -153,27 +153,32 @@ When running `clipbridge.exe` on Windows, it runs silently in the notification t
 * **Right click tray menu**:
   * **Paste with ClipBridge**: Instantly formats and pastes.
   * **Auto-Format Default Paste (Ctrl+V)**: Optional toggle to make standard `Ctrl+V` always auto-format on every copy.
-  * **Output Mode**: Plain Text, Markdown, or Terminal ANSI.
+  * **Pause Formatting (15 Minutes)**: Temporarily pause automatic clipboard rewriting.
+  * **Strip URL Tracking Parameters**: Strip telemetry & tracking (`utm_*`, `fbclid`, `gclid`, etc.).
+  * **Output Mode**: Plain Text, GitHub Markdown, Slack/Discord mrkdwn, Jira/Confluence, or Terminal ANSI.
   * **Table Style**: ASCII Box, Unicode Grid, Markdown Pipe, TSV.
+  * **Language**: Auto (System Default), English, Español.
   * **Start with Windows**: Toggle automatic startup at login.
   * **Exit ClipBridge**: Stop and remove tray icon.
 
 Usage
 -----
 ```
-clipbridge [-w1kpruv] [-m mode] [-t table] [-l link]
+clipbridge [-w1kpruvKh] [-m mode] [-t table] [-l link] [--uninstall] [file ...]
 ```
 
 ### Actions
 * `-w`: Watch clipboard in background and listen for hotkeys (default).
 * `-k`: Format clipboard and paste directly into active focused window.
 * `-1`: Format current clipboard once and update clipboard text.
-* `-p`: Print formatted clipboard content directly to stdout.
+* `-p`: Print formatted clipboard content directly to stdout (or filter piped input).
+* `--uninstall`: Remove desktop shortcuts, startup registrations, and configuration.
 
 ### Formatting Options
-* `-m mode`: Output mode: `plain` (default), `markdown`, `terminal`.
+* `-m mode`: Output mode: `plain` (default), `markdown`, `slack`, `jira`, `terminal`.
 * `-t table`: Table format: `grid` (default), `markdown`, `tsv`, `simple`.
 * `-l link`: Link format: `bracket` (default), `inline`, `text`, `footnote`.
+* `-K`: Keep URL tracking & telemetry parameters (stripped by default).
 * `-u`: Use Unicode box-drawing characters for tables (`┌─┬─┐`).
 * `-r`: Emit Windows CRLF (`\r\n`) line endings.
 * `-v`: Print version.

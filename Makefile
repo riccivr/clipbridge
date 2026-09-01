@@ -5,14 +5,16 @@ include config.mk
 
 UNAME_S := $(shell uname -s)
 
-PLUGIN_SRC = ../unipaste/plugin_builtin.c
-CFLAGS += -DSANITIZE_BUILTIN
+VENDOR_UNIPASTE ?= vendor/unipaste
+
+PLUGIN_SRC = $(VENDOR_UNIPASTE)/plugin_builtin.c
+CFLAGS += -I$(VENDOR_UNIPASTE) -DSANITIZE_BUILTIN
 ifeq ($(SANITIZE),none)
-PLUGIN_SRC = ../unipaste/plugin_none.c
+PLUGIN_SRC = $(VENDOR_UNIPASTE)/plugin_none.c
 CFLAGS := $(filter-out -DSANITIZE_BUILTIN,$(CFLAGS))
 endif
 
-UNIPASTE_SRC = ../unipaste/parser.c ../unipaste/table.c ../unipaste/entity.c ../unipaste/strbuf.c $(PLUGIN_SRC)
+UNIPASTE_SRC = $(VENDOR_UNIPASTE)/parser.c $(VENDOR_UNIPASTE)/table.c $(VENDOR_UNIPASTE)/entity.c $(VENDOR_UNIPASTE)/strbuf.c $(PLUGIN_SRC)
 UNIPASTE_OBJ = parser.o table.o entity.o strbuf.o plugin.o
 
 ifeq ($(UNAME_S),Darwin)
@@ -21,8 +23,8 @@ PLATFORM_OBJ = platform_macos.o
 CFLAGS += -arch arm64 -arch x86_64
 LDFLAGS = -arch arm64 -arch x86_64 -framework AppKit -framework Foundation
 else
-PLATFORM_SRC = platform_posix.c platform_win32.c
-PLATFORM_OBJ = platform_posix.o platform_win32.o
+PLATFORM_SRC = platform_posix.c
+PLATFORM_OBJ = platform_posix.o
 endif
 
 SRC = clipbridge.c i18n.c $(PLATFORM_SRC)
@@ -36,16 +38,16 @@ all: clipbridge
 .m.o:
 	$(CC) -c $(CFLAGS) $<
 
-parser.o: ../unipaste/parser.c
+parser.o: $(VENDOR_UNIPASTE)/parser.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-table.o: ../unipaste/table.c
+table.o: $(VENDOR_UNIPASTE)/table.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-entity.o: ../unipaste/entity.c
+entity.o: $(VENDOR_UNIPASTE)/entity.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-strbuf.o: ../unipaste/strbuf.c
+strbuf.o: $(VENDOR_UNIPASTE)/strbuf.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
 plugin.o: $(PLUGIN_SRC)
@@ -58,8 +60,8 @@ clean:
 	rm -f clipbridge $(OBJ) plugin.o platform_macos.o platform_posix.o platform_win32.o clipbridge_res.o installer_res.o clipbridge.exe clipbridge-portable.exe clipbridge-setup.exe clipbridge-$(VERSION).tar.gz
 
 dist: clean
-	mkdir -p clipbridge-$(VERSION)/scripts clipbridge-$(VERSION)/packaging clipbridge-$(VERSION)/assets
-	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.rc installer.rc clipbridge.1 arg.h clipbridge.h i18n.h clipbridge.c i18n.c installer_win32.c platform_posix.c platform_win32.c platform_macos.m scripts packaging assets clipbridge-$(VERSION)
+	mkdir -p clipbridge-$(VERSION)/scripts clipbridge-$(VERSION)/packaging clipbridge-$(VERSION)/assets clipbridge-$(VERSION)/vendor/unipaste clipbridge-$(VERSION)/tests
+	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.rc installer.rc clipbridge.1 arg.h clipbridge.h i18n.h clipbridge.c i18n.c installer_win32.c platform_posix.c platform_win32.c platform_macos.m scripts packaging assets vendor tests clipbridge-$(VERSION)
 	tar -cf clipbridge-$(VERSION).tar clipbridge-$(VERSION)
 	gzip clipbridge-$(VERSION).tar
 	rm -rf clipbridge-$(VERSION)
@@ -84,7 +86,7 @@ CC_ARM64 ?= aarch64-linux-gnu-gcc
 deb-arm64:
 	@T=$$(mktemp -d); \
 	mkdir -p $$T/DEBIAN $$T/usr/bin $$T/usr/share/man/man1 $$T/usr/share/applications $$T/usr/share/icons/hicolor/scalable/apps $$T/usr/share/pixmaps; \
-	$(CC_ARM64) $(CFLAGS) -std=c99 -pedantic -Wall -Wextra -Os -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"$(VERSION)\" -I../unipaste clipbridge.c i18n.c platform_posix.c $(UNIPASTE_SRC) -o $$T/usr/bin/clipbridge -s; \
+	$(CC_ARM64) $(CFLAGS) -std=c99 -pedantic -Wall -Wextra -Os -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"$(VERSION)\" -I$(VENDOR_UNIPASTE) clipbridge.c i18n.c platform_posix.c $(UNIPASTE_SRC) -o $$T/usr/bin/clipbridge -s; \
 	sed "s/VERSION/$(VERSION)/g" < clipbridge.1 > $$T/usr/share/man/man1/clipbridge.1; \
 	cp packaging/clipbridge.desktop $$T/usr/share/applications/; \
 	cp assets/clipbridge.svg $$T/usr/share/icons/hicolor/scalable/apps/; \
@@ -135,9 +137,6 @@ uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/share/pixmaps/clipbridge.png
 
 test: all
-	@echo "Running clipbridge smoke tests..."
-	./clipbridge -v
-	./clipbridge -h 2>&1 | grep -q "usage:"
-	@echo "[PASS] clipbridge CLI options verified"
+	sh tests/test_clipbridge.sh
 
 .PHONY: all clean dist deb exe dmg install uninstall test
