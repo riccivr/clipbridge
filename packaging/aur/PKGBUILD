@@ -13,7 +13,7 @@ optdepends=(
 	'xsel: Alternative X11 clipboard support'
 )
 source=("https://github.com/riccivr/clipbridge/releases/download/v${pkgver}/clipbridge-${pkgver}.tar.gz")
-sha256sums=('f372ea02963f84d42edd353a5af91f149ec7c5a151fc198108d508dd8cd467f3')
+sha256sums=('8ae11a3296f1bd731ceaa73a80bc34479d19b46c495ac1e9c12f13e7ba458e71')
 
 build() {
 	cd "${pkgname}-${pkgver}"

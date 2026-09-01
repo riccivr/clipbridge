@@ -239,7 +239,7 @@ process_html_to_clipboard(const char *html, size_t len, const struct config *cfg
 	strbuf_init(&sb, len * 2);
 	ret = unipaste_process_to_strbuf(html, len, &sb, cfg);
 	if (ret == 0 && sb.len > 0) {
-		clipboard_write_text_and_preserve_html(sb.data, sb.len, html, len);
+		clipboard_write_text(sb.data, sb.len);
 	}
 	strbuf_free(&sb);
 	return ret;
@@ -281,28 +281,59 @@ clipboard_paste_stdout(const struct config *cfg)
 static void
 simulate_ctrl_v(void)
 {
-	INPUT inputs[4];
+	INPUT inputs[10];
+	int count = 0;
 	memset(inputs, 0, sizeof(inputs));
 
+	/* Ensure modifier keys from global hotkeys (Alt, Win, Shift) are released first */
+	if (GetAsyncKeyState(VK_MENU) & 0x8000) {
+		inputs[count].type = INPUT_KEYBOARD;
+		inputs[count].ki.wVk = VK_MENU;
+		inputs[count].ki.dwFlags = KEYEVENTF_KEYUP;
+		count++;
+	}
+	if (GetAsyncKeyState(VK_LWIN) & 0x8000) {
+		inputs[count].type = INPUT_KEYBOARD;
+		inputs[count].ki.wVk = VK_LWIN;
+		inputs[count].ki.dwFlags = KEYEVENTF_KEYUP;
+		count++;
+	}
+	if (GetAsyncKeyState(VK_RWIN) & 0x8000) {
+		inputs[count].type = INPUT_KEYBOARD;
+		inputs[count].ki.wVk = VK_RWIN;
+		inputs[count].ki.dwFlags = KEYEVENTF_KEYUP;
+		count++;
+	}
+	if (GetAsyncKeyState(VK_SHIFT) & 0x8000) {
+		inputs[count].type = INPUT_KEYBOARD;
+		inputs[count].ki.wVk = VK_SHIFT;
+		inputs[count].ki.dwFlags = KEYEVENTF_KEYUP;
+		count++;
+	}
+
 	/* Ctrl key DOWN */
-	inputs[0].type = INPUT_KEYBOARD;
-	inputs[0].ki.wVk = VK_CONTROL;
+	inputs[count].type = INPUT_KEYBOARD;
+	inputs[count].ki.wVk = VK_CONTROL;
+	count++;
 
 	/* V key DOWN */
-	inputs[1].type = INPUT_KEYBOARD;
-	inputs[1].ki.wVk = 'V';
+	inputs[count].type = INPUT_KEYBOARD;
+	inputs[count].ki.wVk = 'V';
+	count++;
 
 	/* V key UP */
-	inputs[2].type = INPUT_KEYBOARD;
-	inputs[2].ki.wVk = 'V';
-	inputs[2].ki.dwFlags = KEYEVENTF_KEYUP;
+	inputs[count].type = INPUT_KEYBOARD;
+	inputs[count].ki.wVk = 'V';
+	inputs[count].ki.dwFlags = KEYEVENTF_KEYUP;
+	count++;
 
 	/* Ctrl key UP */
-	inputs[3].type = INPUT_KEYBOARD;
-	inputs[3].ki.wVk = VK_CONTROL;
-	inputs[3].ki.dwFlags = KEYEVENTF_KEYUP;
+	inputs[count].type = INPUT_KEYBOARD;
+	inputs[count].ki.wVk = VK_CONTROL;
+	inputs[count].ki.dwFlags = KEYEVENTF_KEYUP;
+	count++;
 
-	SendInput(4, inputs, sizeof(INPUT));
+	SendInput(count, inputs, sizeof(INPUT));
 }
 
 int
