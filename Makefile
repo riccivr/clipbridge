@@ -25,6 +25,7 @@ LDFLAGS = -arch arm64 -arch x86_64 -framework AppKit -framework Foundation
 else
 PLATFORM_SRC = platform_posix.c
 PLATFORM_OBJ = platform_posix.o
+LDFLAGS += -ldl
 endif
 
 SRC = clipbridge.c i18n.c $(PLATFORM_SRC)

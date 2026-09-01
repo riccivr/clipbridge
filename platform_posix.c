@@ -7,7 +7,11 @@
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <dlfcn.h>
 #include <sys/file.h>
+#include <sys/select.h>
+#include <sys/wait.h>
 #include "clipbridge.h"
 #include "unipaste.h"
 #include "i18n.h"
@@ -202,13 +206,314 @@ clipboard_paste_active(const struct config *cfg)
 	return 0;
 }
 
+static void
+sync_clipboard_if_changed(const struct config *cfg, char **last_html, size_t *last_len)
+{
+	char *curr_html = NULL;
+	size_t curr_len = 0;
+
+	/* Apps often publish text then HTML a few milliseconds apart. */
+	usleep(40000);
+
+	if (clipboard_read_html(&curr_html, &curr_len) != 0 || !curr_html || curr_len == 0)
+		return;
+
+	if (*last_html && *last_len == curr_len && memcmp(*last_html, curr_html, curr_len) == 0) {
+		free(curr_html);
+		return;
+	}
+
+	{
+		struct strbuf out_sb;
+		strbuf_init(&out_sb, curr_len * 2);
+		if (unipaste_process_to_strbuf(curr_html, curr_len, &out_sb, cfg) == 0 && out_sb.len > 0) {
+			clipboard_write_text(out_sb.data, out_sb.len);
+			printf("clipbridge: [synced] formatted %zu bytes of rich text -> plain text\n", curr_len);
+			fflush(stdout);
+		}
+		strbuf_free(&out_sb);
+	}
+
+	free(*last_html);
+	*last_html = curr_html;
+	*last_len = curr_len;
+}
+
+static int
+cmd_exists(const char *name)
+{
+	char cmd[128];
+	int st;
+
+	snprintf(cmd, sizeof(cmd), "command -v %s >/dev/null 2>&1", name);
+	st = system(cmd);
+	return st == 0;
+}
+
+static int
+open_watch_pipe(const char *shell_cmd, pid_t *child_pid)
+{
+	int fds[2];
+	pid_t pid;
+
+	if (pipe(fds) != 0)
+		return -1;
+
+	pid = fork();
+	if (pid < 0) {
+		close(fds[0]);
+		close(fds[1]);
+		return -1;
+	}
+
+	if (pid == 0) {
+		close(fds[0]);
+		if (dup2(fds[1], STDOUT_FILENO) < 0)
+			_exit(127);
+		close(fds[1]);
+		execl("/bin/sh", "sh", "-c", shell_cmd, (char *)NULL);
+		_exit(127);
+	}
+
+	close(fds[1]);
+	*child_pid = pid;
+	return fds[0];
+}
+
+static void
+stop_watch_child(pid_t pid, int fd)
+{
+	if (fd >= 0)
+		close(fd);
+	if (pid > 0) {
+		kill(pid, SIGTERM);
+		waitpid(pid, NULL, 0);
+	}
+}
+
+static int
+wait_for_byte(int fd)
+{
+	fd_set rfds;
+	char buf[256];
+	int n, r;
+
+	while (running) {
+		FD_ZERO(&rfds);
+		FD_SET(fd, &rfds);
+		r = select(fd + 1, &rfds, NULL, NULL, NULL);
+		if (r < 0) {
+			if (errno == EINTR)
+				continue;
+			return -1;
+		}
+		if (!running)
+			return 0;
+		if (r > 0 && FD_ISSET(fd, &rfds)) {
+			n = read(fd, buf, sizeof(buf));
+			if (n <= 0)
+				return -1;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/* Wayland: wl-paste --watch is the compositor data-control event path. */
+static int
+watch_wayland(const struct config *cfg, char **last_html, size_t *last_len)
+{
+	pid_t pid = -1;
+	int fd;
+	int ev;
+
+	if (!getenv("WAYLAND_DISPLAY") || !cmd_exists("wl-paste"))
+		return -1;
+
+	fd = open_watch_pipe("exec wl-paste --watch printf '.\\n'", &pid);
+	if (fd < 0)
+		return -1;
+
+	printf("clipbridge: watching Wayland clipboard via wl-paste --watch\n");
+	fflush(stdout);
+
+	/* Catch whatever is already on the board, then wait for events. */
+	sync_clipboard_if_changed(cfg, last_html, last_len);
+
+	while (running) {
+		ev = wait_for_byte(fd);
+		if (ev < 0)
+			break;
+		if (ev > 0)
+			sync_clipboard_if_changed(cfg, last_html, last_len);
+	}
+
+	stop_watch_child(pid, fd);
+	return running ? -1 : 0;
+}
+
+/*
+ * X11: talk to libX11/libXfixes through dlopen so the binary still
+ * links with zero extra build dependencies. Layout of the first
+ * Display fields (ext_data, next, fd) has been stable for decades.
+ */
+struct xdisplay_min {
+	void *ext_data;
+	void *next;
+	int fd;
+};
+
+#define XFIXES_SET_OWNER_MASK        (1L << 0)
+#define XFIXES_WINDOW_DESTROY_MASK   (1L << 1)
+#define XFIXES_CLIENT_CLOSE_MASK     (1L << 2)
+
+static void *
+load_sym(void *lib, const char *name)
+{
+	return dlsym(lib, name);
+}
+
+static int
+watch_x11_xfixes(const struct config *cfg, char **last_html, size_t *last_len)
+{
+	void *libx11 = NULL;
+	void *libxfixes = NULL;
+	void *dpy = NULL;
+	int event_base = 0, error_base = 0;
+	int fd, r;
+	unsigned long clipboard_atom;
+	fd_set rfds;
+	unsigned char ev[256];
+
+	void *(*pXOpenDisplay)(const char *);
+	int (*pXCloseDisplay)(void *);
+	unsigned long (*pXInternAtom)(void *, const char *, int);
+	int (*pXDefaultScreen)(void *);
+	unsigned long (*pXRootWindow)(void *, int);
+	int (*pXPending)(void *);
+	int (*pXNextEvent)(void *, void *);
+	int (*pXFixesQueryExtension)(void *, int *, int *);
+	void (*pXFixesSelectSelectionInput)(void *, unsigned long, unsigned long, unsigned long);
+
+	if (!getenv("DISPLAY") || getenv("WAYLAND_DISPLAY"))
+		return -1;
+
+	libx11 = dlopen("libX11.so.6", RTLD_LAZY);
+	libxfixes = dlopen("libXfixes.so.3", RTLD_LAZY);
+	if (!libx11 || !libxfixes)
+		goto fail_open;
+
+	memcpy(&pXOpenDisplay, (void *[]){ load_sym(libx11, "XOpenDisplay") }, sizeof(pXOpenDisplay));
+	memcpy(&pXCloseDisplay, (void *[]){ load_sym(libx11, "XCloseDisplay") }, sizeof(pXCloseDisplay));
+	memcpy(&pXInternAtom, (void *[]){ load_sym(libx11, "XInternAtom") }, sizeof(pXInternAtom));
+	memcpy(&pXDefaultScreen, (void *[]){ load_sym(libx11, "XDefaultScreen") }, sizeof(pXDefaultScreen));
+	memcpy(&pXRootWindow, (void *[]){ load_sym(libx11, "XRootWindow") }, sizeof(pXRootWindow));
+	memcpy(&pXPending, (void *[]){ load_sym(libx11, "XPending") }, sizeof(pXPending));
+	memcpy(&pXNextEvent, (void *[]){ load_sym(libx11, "XNextEvent") }, sizeof(pXNextEvent));
+	memcpy(&pXFixesQueryExtension, (void *[]){ load_sym(libxfixes, "XFixesQueryExtension") }, sizeof(pXFixesQueryExtension));
+	memcpy(&pXFixesSelectSelectionInput, (void *[]){ load_sym(libxfixes, "XFixesSelectSelectionInput") },
+		sizeof(pXFixesSelectSelectionInput));
+
+	if (!pXOpenDisplay || !pXCloseDisplay || !pXInternAtom || !pXDefaultScreen ||
+	    !pXRootWindow || !pXPending || !pXNextEvent ||
+	    !pXFixesQueryExtension || !pXFixesSelectSelectionInput)
+		goto fail_open;
+
+	dpy = pXOpenDisplay(NULL);
+	if (!dpy)
+		goto fail_open;
+
+	if (!pXFixesQueryExtension(dpy, &event_base, &error_base)) {
+		pXCloseDisplay(dpy);
+		goto fail_open;
+	}
+
+	clipboard_atom = pXInternAtom(dpy, "CLIPBOARD", 0);
+	pXFixesSelectSelectionInput(dpy,
+		pXRootWindow(dpy, pXDefaultScreen(dpy)),
+		clipboard_atom,
+		XFIXES_SET_OWNER_MASK | XFIXES_WINDOW_DESTROY_MASK | XFIXES_CLIENT_CLOSE_MASK);
+
+	fd = ((struct xdisplay_min *)dpy)->fd;
+	if (fd < 0) {
+		pXCloseDisplay(dpy);
+		goto fail_open;
+	}
+
+	printf("clipbridge: watching X11 CLIPBOARD via XFixes\n");
+	fflush(stdout);
+
+	sync_clipboard_if_changed(cfg, last_html, last_len);
+
+	while (running) {
+		FD_ZERO(&rfds);
+		FD_SET(fd, &rfds);
+		r = select(fd + 1, &rfds, NULL, NULL, NULL);
+		if (r < 0) {
+			if (errno == EINTR)
+				continue;
+			break;
+		}
+		if (!running)
+			break;
+		while (pXPending(dpy))
+			pXNextEvent(dpy, ev);
+		sync_clipboard_if_changed(cfg, last_html, last_len);
+	}
+
+	pXCloseDisplay(dpy);
+	dlclose(libxfixes);
+	dlclose(libx11);
+	return 0;
+
+fail_open:
+	if (libxfixes)
+		dlclose(libxfixes);
+	if (libx11)
+		dlclose(libx11);
+	return -1;
+}
+
+/* Optional helper used by many X11 clipboard tools. */
+static int
+watch_clipnotify(const struct config *cfg, char **last_html, size_t *last_len)
+{
+	if (getenv("WAYLAND_DISPLAY") || !cmd_exists("clipnotify"))
+		return -1;
+
+	printf("clipbridge: watching X11 clipboard via clipnotify\n");
+	fflush(stdout);
+
+	sync_clipboard_if_changed(cfg, last_html, last_len);
+
+	while (running) {
+		int st = system("clipnotify");
+		if (!running)
+			break;
+		if (st != 0)
+			return -1;
+		sync_clipboard_if_changed(cfg, last_html, last_len);
+	}
+	return 0;
+}
+
+static void
+watch_poll_fallback(const struct config *cfg, char **last_html, size_t *last_len)
+{
+	printf("clipbridge: no event source available, polling every 250ms\n");
+	fflush(stdout);
+
+	while (running) {
+		sync_clipboard_if_changed(cfg, last_html, last_len);
+		usleep(250000);
+	}
+}
+
 int
 clipboard_watch(const struct config *cfg)
 {
 	char *last_html = NULL;
 	size_t last_len = 0;
-	char *curr_html = NULL;
-	size_t curr_len = 0;
 	struct sigaction sa;
 	int lock_fd;
 
@@ -232,32 +537,11 @@ clipboard_watch(const struct config *cfg)
 	printf("clipbridge: %s\n", i18n_get(STR_TOOLTIP_ACTIVE));
 	fflush(stdout);
 
-	while (running) {
-		if (clipboard_read_html(&curr_html, &curr_len) == 0 && curr_html && curr_len > 0) {
-			if (last_html == NULL || last_len != curr_len || memcmp(last_html, curr_html, curr_len) != 0) {
-				struct strbuf out_sb;
-				strbuf_init(&out_sb, curr_len * 2);
-
-				if (unipaste_process_to_strbuf(curr_html, curr_len, &out_sb, cfg) == 0) {
-					if (out_sb.len > 0) {
-						clipboard_write_text(out_sb.data, out_sb.len);
-						printf("clipbridge: [synced] formatted %zu bytes of rich text -> plain text\n", curr_len);
-						fflush(stdout);
-					}
-				}
-				strbuf_free(&out_sb);
-
-				free(last_html);
-				last_html = curr_html;
-				last_len = curr_len;
-				curr_html = NULL;
-			} else {
-				free(curr_html);
-				curr_html = NULL;
-			}
+	if (watch_wayland(cfg, &last_html, &last_len) != 0 && running) {
+		if (watch_x11_xfixes(cfg, &last_html, &last_len) != 0 && running) {
+			if (watch_clipnotify(cfg, &last_html, &last_len) != 0 && running)
+				watch_poll_fallback(cfg, &last_html, &last_len);
 		}
-
-		usleep(250000); /* 250ms interval */
 	}
 
 	free(last_html);

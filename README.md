@@ -15,7 +15,7 @@ When you paste into plain-text targets (Notepad, terminals, vim, code editors), 
 
 How clipbridge Works
 --------------------
-`clipbridge` monitors clipboard updates using native OS event hooks on Windows and macOS, and lightweight background polling on Linux. When an application copies rich HTML, `clipbridge` runs the HTML through the `unipaste` engine and updates the plain-text clipboard slot with clean markdown, tables, and links.
+`clipbridge` monitors clipboard updates using native OS event hooks: Win32 `AddClipboardFormatListener`, macOS `NSPasteboard` `changeCount`, Wayland `wl-paste --watch`, and X11 XFixes (or `clipnotify`). Linux falls back to 250ms polling only if no event source is available. When an application copies rich HTML, `clipbridge` runs the HTML through the `unipaste` engine and updates the plain-text clipboard slot with clean markdown, tables, and links.
 
 Features
 --------
@@ -25,8 +25,8 @@ Features
 * **Platform backends**:
   * **Windows**: Native pure Win32 API (`AddClipboardFormatListener`, tray icon, registry persistence, hotkeys, 0 external dependencies).
   * **macOS**: Native Cocoa/AppKit `NSPasteboard` changeCount tracking.
-  * **Linux (Wayland)**: Uses `wl-clipboard` (`wl-paste` and `wl-copy`).
-  * **Linux (X11)**: Uses `xclip` or `xsel`.
+  * **Linux (Wayland)**: Event-driven via `wl-paste --watch`; read/write through `wl-clipboard`.
+  * **Linux (X11)**: Event-driven via XFixes (`libX11`/`libXfixes` loaded at runtime) or `clipnotify`; read/write through `xclip` or `xsel`. Polls every 250ms only if no event source is available.
 * **Modes**:
   * Background daemon (`clipbridge -w`).
   * One-shot hotkey sync (`clipbridge -1`).
