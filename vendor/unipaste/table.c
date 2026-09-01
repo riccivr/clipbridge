@@ -201,13 +201,18 @@ table_add_row(struct table *t)
 }
 
 void
-table_add_cell(struct table *t, const char *text, int is_header)
+table_add_cell_span(struct table *t, const char *text, int is_header, int colspan)
 {
 	struct table_cell *cell;
 	char *cleaned;
 
 	if (!t || t->num_rows == 0 || t->current_col >= MAX_TABLE_COLS)
 		return;
+
+	if (colspan < 1)
+		colspan = 1;
+	if (t->current_col + colspan > MAX_TABLE_COLS)
+		colspan = MAX_TABLE_COLS - t->current_col;
 
 	cleaned = xstrdup(text ? text : "");
 	trim_whitespace(cleaned);
@@ -219,20 +224,50 @@ table_add_cell(struct table *t, const char *text, int is_header)
 	}
 	cell->text = cleaned;
 	cell->is_header = is_header;
-	cell->colspan = 1;
+	cell->colspan = colspan;
 	cell->rowspan = 1;
 
 	t->cells[t->num_rows - 1][t->current_col] = cell;
-	t->current_col++;
+	t->current_col += colspan;
 	if (t->current_col > t->num_cols)
 		t->num_cols = t->current_col;
+}
+
+void
+table_add_cell(struct table *t, const char *text, int is_header)
+{
+	table_add_cell_span(t, text, is_header, 1);
+}
+
+/* Display width of a cell that may span multiple columns */
+static int
+span_content_width(const struct table *t, int start_col, int colspan)
+{
+	int c, w = 0;
+
+	if (colspan < 1)
+		colspan = 1;
+	for (c = 0; c < colspan && start_col + c < t->num_cols; c++) {
+		w += t->col_widths[start_col + c];
+		if (c + 1 < colspan)
+			w += 3; /* " | " between spanned columns */
+	}
+	return w;
+}
+
+static int
+cell_colspan(const struct table_cell *cell)
+{
+	if (!cell || cell->colspan < 1)
+		return 1;
+	return cell->colspan;
 }
 
 /* Calculate column widths */
 static void
 table_calculate_widths(struct table *t)
 {
-	int r, c;
+	int r, c, cs, have, extra, last;
 	size_t w;
 
 	for (c = 0; c < t->num_cols && c < MAX_TABLE_COLS; c++)
@@ -240,10 +275,22 @@ table_calculate_widths(struct table *t)
 
 	for (r = 0; r < t->num_rows && r < MAX_TABLE_ROWS; r++) {
 		for (c = 0; c < t->num_cols && c < MAX_TABLE_COLS; c++) {
-			if (t->cells[r][c] && t->cells[r][c]->text) {
-				w = utf8_width(t->cells[r][c]->text);
+			if (!t->cells[r][c] || !t->cells[r][c]->text)
+				continue;
+			w = utf8_width(t->cells[r][c]->text);
+			cs = cell_colspan(t->cells[r][c]);
+			if (c + cs > t->num_cols)
+				cs = t->num_cols - c;
+			if (cs <= 1) {
 				if ((int)w > t->col_widths[c])
 					t->col_widths[c] = (int)w;
+			} else {
+				have = span_content_width(t, c, cs);
+				if ((int)w > have) {
+					extra = (int)w - have;
+					last = c + cs - 1;
+					t->col_widths[last] += extra;
+				}
 			}
 		}
 	}
@@ -264,47 +311,77 @@ render_grid_sep(struct strbuf *out, const struct table *t, char left, char mid, 
 	strbuf_puts(out, "\n");
 }
 
+static void
+render_padded_cell(struct strbuf *out, const char *txt, int target_width, const char *bar)
+{
+	size_t w;
+	int pad, i;
+
+	if (!txt)
+		txt = "";
+	w = utf8_width(txt);
+	strbuf_puts(out, " ");
+	strbuf_puts(out, txt);
+	pad = target_width - (int)w + 1;
+	if (pad < 1)
+		pad = 1;
+	for (i = 0; i < pad; i++)
+		strbuf_putc(out, ' ');
+	strbuf_puts(out, bar);
+}
+
 /* Render ASCII / Unicode Grid Table */
 static void
 render_grid(const struct table *t, struct strbuf *out, int unicode)
 {
-	int r, c, i, pad;
+	int r, c, i, cs, skip, width;
 	const char *txt;
-	size_t w;
+	const char *vbar = unicode ? "│" : "|";
 
 	if (unicode) {
-		/* Unicode table box-drawing */
 		strbuf_puts(out, "┌");
 		for (c = 0; c < t->num_cols; c++) {
 			for (i = 0; i < t->col_widths[c] + 2; i++)
 				strbuf_puts(out, "─");
 			strbuf_puts(out, (c == t->num_cols - 1) ? "┐\n" : "┬");
 		}
+	} else {
+		render_grid_sep(out, t, '+', '+', '+', '-');
+	}
 
-		for (r = 0; r < t->num_rows; r++) {
-			strbuf_puts(out, "│");
-			for (c = 0; c < t->num_cols; c++) {
-				txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
-				w = utf8_width(txt);
-				strbuf_puts(out, " ");
-				strbuf_puts(out, txt);
-				pad = t->col_widths[c] - (int)w + 1;
-				for (i = 0; i < pad; i++)
-					strbuf_puts(out, " ");
-				strbuf_puts(out, "│");
+	for (r = 0; r < t->num_rows; r++) {
+		strbuf_puts(out, vbar);
+		skip = 0;
+		for (c = 0; c < t->num_cols; c++) {
+			if (skip > 0) {
+				skip--;
+				continue;
 			}
-			strbuf_puts(out, "\n");
+			cs = cell_colspan(t->cells[r][c]);
+			if (c + cs > t->num_cols)
+				cs = t->num_cols - c;
+			txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
+			width = span_content_width(t, c, cs);
+			render_padded_cell(out, txt, width, vbar);
+			skip = cs - 1;
+		}
+		strbuf_puts(out, "\n");
 
-			if (r == 0 && t->num_rows > 1) {
+		if (r == 0 && t->num_rows > 1) {
+			if (unicode) {
 				strbuf_puts(out, "├");
 				for (c = 0; c < t->num_cols; c++) {
 					for (i = 0; i < t->col_widths[c] + 2; i++)
 						strbuf_puts(out, "─");
 					strbuf_puts(out, (c == t->num_cols - 1) ? "┤\n" : "┼");
 				}
+			} else {
+				render_grid_sep(out, t, '+', '+', '+', '-');
 			}
 		}
+	}
 
+	if (unicode) {
 		strbuf_puts(out, "└");
 		for (c = 0; c < t->num_cols; c++) {
 			for (i = 0; i < t->col_widths[c] + 2; i++)
@@ -312,27 +389,6 @@ render_grid(const struct table *t, struct strbuf *out, int unicode)
 			strbuf_puts(out, (c == t->num_cols - 1) ? "┘\n" : "┴");
 		}
 	} else {
-		/* Standard ASCII grid */
-		render_grid_sep(out, t, '+', '+', '+', '-');
-
-		for (r = 0; r < t->num_rows; r++) {
-			strbuf_puts(out, "|");
-			for (c = 0; c < t->num_cols; c++) {
-				txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
-				w = utf8_width(txt);
-				strbuf_puts(out, " ");
-				strbuf_puts(out, txt);
-				pad = t->col_widths[c] - (int)w + 1;
-				for (i = 0; i < pad; i++)
-					strbuf_putc(out, ' ');
-				strbuf_puts(out, "|");
-			}
-			strbuf_puts(out, "\n");
-
-			if (r == 0 && t->num_rows > 1)
-				render_grid_sep(out, t, '+', '+', '+', '-');
-		}
-
 		render_grid_sep(out, t, '+', '+', '+', '-');
 	}
 }
@@ -341,25 +397,27 @@ render_grid(const struct table *t, struct strbuf *out, int unicode)
 static void
 render_markdown(const struct table *t, struct strbuf *out)
 {
-	int r, c, i, pad;
+	int r, c, i, cs, skip, width;
 	const char *txt;
-	size_t w;
 
 	for (r = 0; r < t->num_rows; r++) {
 		strbuf_puts(out, "|");
+		skip = 0;
 		for (c = 0; c < t->num_cols; c++) {
+			if (skip > 0) {
+				skip--;
+				continue;
+			}
+			cs = cell_colspan(t->cells[r][c]);
+			if (c + cs > t->num_cols)
+				cs = t->num_cols - c;
 			txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
-			w = utf8_width(txt);
-			strbuf_puts(out, " ");
-			strbuf_puts(out, txt);
-			pad = t->col_widths[c] - (int)w + 1;
-			for (i = 0; i < pad; i++)
-				strbuf_putc(out, ' ');
-			strbuf_puts(out, "|");
+			width = span_content_width(t, c, cs);
+			render_padded_cell(out, txt, width, "|");
+			skip = cs - 1;
 		}
 		strbuf_puts(out, "\n");
 
-		/* Output header separator row after row 0 */
 		if (r == 0) {
 			strbuf_puts(out, "|");
 			for (c = 0; c < t->num_cols; c++) {
@@ -377,15 +435,29 @@ render_markdown(const struct table *t, struct strbuf *out)
 static void
 render_tsv(const struct table *t, struct strbuf *out)
 {
-	int r, c;
+	int r, c, cs, skip, i;
 	const char *txt;
 
 	for (r = 0; r < t->num_rows; r++) {
+		skip = 0;
 		for (c = 0; c < t->num_cols; c++) {
+			if (skip > 0) {
+				skip--;
+				strbuf_putc(out, '\t');
+				continue;
+			}
+			cs = cell_colspan(t->cells[r][c]);
+			if (c + cs > t->num_cols)
+				cs = t->num_cols - c;
 			txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
 			strbuf_puts(out, txt);
 			if (c < t->num_cols - 1)
 				strbuf_putc(out, '\t');
+			for (i = 1; i < cs && c + i < t->num_cols; i++) {
+				if (c + i < t->num_cols - 1)
+					strbuf_putc(out, '\t');
+			}
+			skip = cs - 1;
 		}
 		strbuf_puts(out, "\n");
 	}
@@ -395,20 +467,32 @@ render_tsv(const struct table *t, struct strbuf *out)
 static void
 render_simple(const struct table *t, struct strbuf *out)
 {
-	int r, c, i, pad;
+	int r, c, i, pad, cs, skip, width;
 	const char *txt;
 	size_t w;
 
 	for (r = 0; r < t->num_rows; r++) {
+		skip = 0;
 		for (c = 0; c < t->num_cols; c++) {
+			if (skip > 0) {
+				skip--;
+				continue;
+			}
+			cs = cell_colspan(t->cells[r][c]);
+			if (c + cs > t->num_cols)
+				cs = t->num_cols - c;
 			txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
 			w = utf8_width(txt);
 			strbuf_puts(out, txt);
-			if (c < t->num_cols - 1) {
-				pad = t->col_widths[c] - (int)w + 2;
+			if (c + cs < t->num_cols) {
+				width = span_content_width(t, c, cs);
+				pad = width - (int)w + 2;
+				if (pad < 2)
+					pad = 2;
 				for (i = 0; i < pad; i++)
 					strbuf_putc(out, ' ');
 			}
+			skip = cs - 1;
 		}
 		strbuf_puts(out, "\n");
 
@@ -428,29 +512,59 @@ render_simple(const struct table *t, struct strbuf *out)
 static void
 render_jira(const struct table *t, struct strbuf *out)
 {
-	int r, c;
+	int r, c, cs, skip;
 	const char *txt;
 	int is_header_row;
 
 	for (r = 0; r < t->num_rows; r++) {
 		is_header_row = (r == 0 && (t->in_header || (t->cells[0][0] && t->cells[0][0]->is_header)));
+		skip = 0;
 
-		if (is_header_row) {
-			for (c = 0; c < t->num_cols; c++) {
-				txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
-				strbuf_puts(out, "|| ");
-				strbuf_puts(out, txt);
-				strbuf_puts(out, " ");
+		for (c = 0; c < t->num_cols; c++) {
+			if (skip > 0) {
+				skip--;
+				continue;
 			}
-			strbuf_puts(out, "||\n");
-		} else {
-			for (c = 0; c < t->num_cols; c++) {
-				txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
-				strbuf_puts(out, "| ");
-				strbuf_puts(out, txt);
-				strbuf_puts(out, " ");
+			cs = cell_colspan(t->cells[r][c]);
+			if (c + cs > t->num_cols)
+				cs = t->num_cols - c;
+			txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
+			strbuf_puts(out, is_header_row ? "|| " : "| ");
+			strbuf_puts(out, txt);
+			strbuf_puts(out, " ");
+			skip = cs - 1;
+		}
+		strbuf_puts(out, is_header_row ? "||\n" : "|\n");
+	}
+}
+
+/* Compact one-line rendering for a nested table embedded in a parent cell */
+void
+table_render_inline(struct table *t, struct strbuf *out)
+{
+	int r, c, cs, skip;
+	const char *txt;
+
+	if (!t || t->num_rows == 0 || t->num_cols == 0)
+		return;
+
+	for (r = 0; r < t->num_rows; r++) {
+		if (r > 0)
+			strbuf_puts(out, "; ");
+		skip = 0;
+		for (c = 0; c < t->num_cols; c++) {
+			if (skip > 0) {
+				skip--;
+				continue;
 			}
-			strbuf_puts(out, "|\n");
+			cs = cell_colspan(t->cells[r][c]);
+			if (c + cs > t->num_cols)
+				cs = t->num_cols - c;
+			txt = (t->cells[r][c] && t->cells[r][c]->text) ? t->cells[r][c]->text : "";
+			if (c > 0)
+				strbuf_puts(out, " | ");
+			strbuf_puts(out, txt);
+			skip = cs - 1;
 		}
 	}
 }

@@ -330,6 +330,13 @@ flush_heading(struct parser_state *st)
 	if (st->heading_level == 0)
 		return;
 
+	/* Headings inside table cells already landed in textbuf via emit_text. */
+	if (st->table_depth > 0) {
+		st->heading_level = 0;
+		strbuf_reset(&st->heading_text);
+		return;
+	}
+
 	emit_newlines(st, 2);
 	emit_indent(st);
 
@@ -715,7 +722,7 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 		st->underline_depth++;
 		if (st->cfg->mode == MODE_TERMINAL)
 			emit_text(st, "\033[4m");
-		else if (st->cfg->mode == MODE_JIRA && !st->table_depth)
+		else if (st->cfg->mode == MODE_JIRA)
 			emit_text(st, "+");
 	} else if (tag_is(name, "a")) {
 		if (st->need_space && !st->at_line_start && !st->table_depth) {
@@ -730,6 +737,14 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 		}
 	} else if (tag_is(name, "table")) {
 		if (st->table_depth < MAX_TABLE_DEPTH) {
+			if (st->table_depth > 0) {
+				/* Preserve parent cell text across inner <td> resets. */
+				strbuf_reset(&st->cell_save[st->table_depth]);
+				if (st->textbuf.len > 0)
+					strbuf_append(&st->cell_save[st->table_depth],
+					              st->textbuf.data, st->textbuf.len);
+				strbuf_reset(&st->textbuf);
+			}
 			st->table_stack[st->table_depth++] = table_create();
 			if (st->table_depth == 1)
 				emit_newlines(st, 2);
@@ -740,11 +755,19 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 	} else if (tag_is(name, "th") || tag_is(name, "td")) {
 		strbuf_reset(&st->textbuf);
 		st->need_space = 0;
+		st->pending_colspan = 1;
+		if (extract_attribute(tag_str, "colspan", attr_val, sizeof(attr_val))) {
+			int cs = atoi(attr_val);
+			if (cs > 0)
+				st->pending_colspan = cs;
+		}
 	} else if (tag_is(name, "b") || tag_is(name, "strong")) {
 		st->bold_depth++;
 		if (st->cfg->mode == MODE_MARKDOWN)
 			emit_text(st, "**");
-		else if ((st->cfg->mode == MODE_SLACK || st->cfg->mode == MODE_JIRA) && !st->table_depth)
+		else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+			emit_text(st, "*");
+		else if (st->cfg->mode == MODE_JIRA)
 			emit_text(st, "*");
 		else if (st->cfg->mode == MODE_TERMINAL)
 			emit_text(st, "\033[1m");
@@ -752,7 +775,9 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 		st->italic_depth++;
 		if (st->cfg->mode == MODE_MARKDOWN)
 			emit_text(st, "*");
-		else if ((st->cfg->mode == MODE_SLACK || st->cfg->mode == MODE_JIRA) && !st->table_depth)
+		else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+			emit_text(st, "_");
+		else if (st->cfg->mode == MODE_JIRA)
 			emit_text(st, "_");
 		else if (st->cfg->mode == MODE_TERMINAL)
 			emit_text(st, "\033[3m");
@@ -762,7 +787,7 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 			emit_text(st, "~~");
 		else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
 			emit_text(st, "~");
-		else if (st->cfg->mode == MODE_JIRA && !st->table_depth)
+		else if (st->cfg->mode == MODE_JIRA)
 			emit_text(st, "-");
 	} else if (tag_is(name, "input")) {
 		if (strstr(tag_str, "type=\"checkbox\"") || strstr(tag_str, "type='checkbox'")) {
@@ -782,7 +807,6 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 	char name[MAX_TAG_NAME];
 	const char *p = tag_str;
 	size_t i = 0;
-	size_t k;
 
 	while (*p && !isspace((unsigned char)*p) && *p != '>' && i < MAX_TAG_NAME - 1)
 		name[i++] = *p++;
@@ -836,7 +860,7 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 			st->underline_depth--;
 			if (st->cfg->mode == MODE_TERMINAL)
 				emit_text(st, "\033[0m");
-			else if (st->cfg->mode == MODE_JIRA && !st->table_depth)
+			else if (st->cfg->mode == MODE_JIRA)
 				emit_text(st, "+");
 		}
 	} else if (tag_is(name, "a")) {
@@ -845,19 +869,23 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 		if (st->table_depth > 1) {
 			struct strbuf inner_buf;
 			strbuf_init(&inner_buf, 512);
-			table_render(st->table_stack[st->table_depth - 1], &inner_buf, st->cfg);
+			table_render_inline(st->table_stack[st->table_depth - 1], &inner_buf);
 			table_free(st->table_stack[st->table_depth - 1]);
 			st->table_stack[st->table_depth - 1] = NULL;
 			st->table_depth--;
 
-			for (k = 0; k < inner_buf.len; k++) {
-				if (inner_buf.data[k] == '\n' || inner_buf.data[k] == '\r') {
-					if (st->textbuf.len > 0 && st->textbuf.data[st->textbuf.len - 1] != ' ')
-						strbuf_putc(&st->textbuf, ' ');
-				} else {
-					strbuf_putc(&st->textbuf, inner_buf.data[k]);
-				}
+			strbuf_reset(&st->textbuf);
+			if (st->cell_save[st->table_depth].len > 0) {
+				strbuf_append(&st->textbuf,
+				              st->cell_save[st->table_depth].data,
+				              st->cell_save[st->table_depth].len);
+				strbuf_reset(&st->cell_save[st->table_depth]);
+				if (st->textbuf.len > 0 &&
+				    st->textbuf.data[st->textbuf.len - 1] != ' ')
+					strbuf_putc(&st->textbuf, ' ');
 			}
+			if (inner_buf.len > 0)
+				strbuf_append(&st->textbuf, inner_buf.data, inner_buf.len);
 			strbuf_free(&inner_buf);
 		} else if (st->table_depth == 1) {
 			if (st->textbuf.len > 0) {
@@ -873,15 +901,20 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 		}
 	} else if (tag_is(name, "th") || tag_is(name, "td")) {
 		if (st->table_depth > 0)
-			table_add_cell(st->table_stack[st->table_depth - 1], st->textbuf.data, tag_is(name, "th"));
+			table_add_cell_span(st->table_stack[st->table_depth - 1],
+			                   st->textbuf.data, tag_is(name, "th"),
+			                   st->pending_colspan);
 		strbuf_reset(&st->textbuf);
 		st->need_space = 0;
+		st->pending_colspan = 1;
 	} else if (tag_is(name, "b") || tag_is(name, "strong")) {
 		if (st->bold_depth > 0) {
 			st->bold_depth--;
 			if (st->cfg->mode == MODE_MARKDOWN)
 				emit_text(st, "**");
-			else if ((st->cfg->mode == MODE_SLACK || st->cfg->mode == MODE_JIRA) && !st->table_depth)
+			else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+				emit_text(st, "*");
+			else if (st->cfg->mode == MODE_JIRA)
 				emit_text(st, "*");
 			else if (st->cfg->mode == MODE_TERMINAL)
 				emit_text(st, "\033[0m");
@@ -891,7 +924,9 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 			st->italic_depth--;
 			if (st->cfg->mode == MODE_MARKDOWN)
 				emit_text(st, "*");
-			else if ((st->cfg->mode == MODE_SLACK || st->cfg->mode == MODE_JIRA) && !st->table_depth)
+			else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+				emit_text(st, "_");
+			else if (st->cfg->mode == MODE_JIRA)
 				emit_text(st, "_");
 			else if (st->cfg->mode == MODE_TERMINAL)
 				emit_text(st, "\033[0m");
@@ -903,7 +938,7 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 				emit_text(st, "~~");
 			else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
 				emit_text(st, "~");
-			else if (st->cfg->mode == MODE_JIRA && !st->table_depth)
+			else if (st->cfg->mode == MODE_JIRA)
 				emit_text(st, "-");
 		}
 	} else if (tag_is(name, "annotation")) {
@@ -1131,6 +1166,8 @@ unipaste_process_to_strbuf(const char *input, size_t len, struct strbuf *out, co
 	strbuf_init(&st.link_text, 256);
 	strbuf_init(&st.heading_text, 256);
 	strbuf_init(&st.math_text, 256);
+	for (i = 0; i < MAX_TABLE_DEPTH; i++)
+		strbuf_init(&st.cell_save[i], 128);
 
 	p = input;
 	end = p + len;
@@ -1287,6 +1324,8 @@ unipaste_process_to_strbuf(const char *input, size_t len, struct strbuf *out, co
 	strbuf_free(&st.link_text);
 	strbuf_free(&st.heading_text);
 	strbuf_free(&st.math_text);
+	for (i = 0; i < MAX_TABLE_DEPTH; i++)
+		strbuf_free(&st.cell_save[i]);
 	free(alloc_input);
 
 	return 0;

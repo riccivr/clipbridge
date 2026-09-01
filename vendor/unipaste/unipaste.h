@@ -115,7 +115,9 @@ struct parser_state {
 	/* Table tracking */
 #define MAX_TABLE_DEPTH 8
 	struct table *table_stack[MAX_TABLE_DEPTH];
+	struct strbuf cell_save[MAX_TABLE_DEPTH];
 	int table_depth;
+	int pending_colspan;
 	
 	/* Paragraph / spacing tracking */
 	int consecutive_newlines;
@@ -140,7 +142,9 @@ struct table *table_create(void);
 void table_free(struct table *t);
 void table_add_row(struct table *t);
 void table_add_cell(struct table *t, const char *text, int is_header);
+void table_add_cell_span(struct table *t, const char *text, int is_header, int colspan);
 void table_render(struct table *t, struct strbuf *out, const struct config *cfg);
+void table_render_inline(struct table *t, struct strbuf *out);
 
 /* URL utilities */
 void url_strip_tracking_inplace(char *url);
