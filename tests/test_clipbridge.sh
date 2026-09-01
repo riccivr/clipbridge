@@ -96,10 +96,24 @@ if [ -n "$WAYLAND_DISPLAY" ] && command -v wl-copy >/dev/null 2>&1 && command -v
 		printf "[FAIL] Live Clipboard (Wayland): Expected '**Live**', got '%s'\n" "$TEXT_OUT"
 		FAILED=$((FAILED + 1))
 	fi
+	if [ -n "$DISPLAY" ] && command -v xclip >/dev/null 2>&1; then
+		HTML_OUT=$(xclip -selection clipboard -t text/html -o 2>/dev/null || true)
+		case "$HTML_OUT" in
+			*"<b>Live</b>"*|*"<b>Live</b>"*)
+				printf "[PASS] Live Clipboard (XWayland): HTML slot preserved\n"
+				PASSED=$((PASSED + 1))
+				;;
+			*)
+				printf "[FAIL] Live Clipboard (XWayland): HTML slot lost\n"
+				FAILED=$((FAILED + 1))
+				;;
+		esac
+	fi
 elif [ -n "$DISPLAY" ] && command -v xclip >/dev/null 2>&1; then
 	printf "<b>Live</b>" | xclip -selection clipboard -t text/html
 	$EXE -1 -m markdown
 	TEXT_OUT=$(xclip -selection clipboard -o 2>/dev/null || true)
+	HTML_OUT=$(xclip -selection clipboard -t text/html -o 2>/dev/null || true)
 	if [ "$TEXT_OUT" = "**Live**" ]; then
 		printf "[PASS] Live Clipboard (X11): Formatted plain text updated\n"
 		PASSED=$((PASSED + 1))
@@ -107,8 +121,38 @@ elif [ -n "$DISPLAY" ] && command -v xclip >/dev/null 2>&1; then
 		printf "[FAIL] Live Clipboard (X11): Expected '**Live**', got '%s'\n" "$TEXT_OUT"
 		FAILED=$((FAILED + 1))
 	fi
+	case "$HTML_OUT" in
+		*"<b>Live</b>"*)
+			printf "[PASS] Live Clipboard (X11): HTML slot preserved\n"
+			PASSED=$((PASSED + 1))
+			;;
+		*)
+			printf "[FAIL] Live Clipboard (X11): HTML slot lost (got '%s')\n" "$HTML_OUT"
+			FAILED=$((FAILED + 1))
+			;;
+	esac
 else
 	printf "[SKIP] Live Clipboard test: No active GUI/display session detected in this test run\n"
+fi
+
+# Test 12: Watch backend starts and names its event source (CI, no GUI required)
+if command -v timeout >/dev/null 2>&1; then
+	WATCH_LOG=$(timeout 1 "$EXE" -w 2>&1 || true)
+	case "$WATCH_LOG" in
+		*"watching Wayland clipboard via wl-paste --watch"*|*"watching X11 CLIPBOARD via XFixes"*|*"watching X11 clipboard via clipnotify"*|*"no event source available, polling every 250ms"*)
+			printf "[PASS] Watch: announced an event backend\n"
+			PASSED=$((PASSED + 1))
+			;;
+		*"another instance is already running"*)
+			printf "[SKIP] Watch: another clipbridge instance is running\n"
+			;;
+		*)
+			printf "[FAIL] Watch: did not announce a backend\n=== Actual ===\n%s\n" "$WATCH_LOG"
+			FAILED=$((FAILED + 1))
+			;;
+	esac
+else
+	printf "[SKIP] Watch: timeout(1) not available\n"
 fi
 
 echo ""

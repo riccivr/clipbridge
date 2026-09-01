@@ -75,7 +75,7 @@ jobs:
         run: |
           VERSION=$(grep '^VERSION' config.mk | cut -d '=' -f 2 | tr -d ' ')
           make deb-arm64
-          aarch64-linux-gnu-gcc -std=c99 -pedantic -Wall -Wextra -Os -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"${VERSION}\" -I../unipaste clipbridge.c i18n.c platform_posix.c ../unipaste/parser.c ../unipaste/table.c ../unipaste/entity.c ../unipaste/strbuf.c ../unipaste/plugin_none.c -o clipbridge-arm64 -s
+          aarch64-linux-gnu-gcc -std=c99 -pedantic -Wall -Wextra -Os -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"${VERSION}\" -Ivendor/unipaste -DSANITIZE_BUILTIN clipbridge.c i18n.c platform_posix.c vendor/unipaste/parser.c vendor/unipaste/table.c vendor/unipaste/entity.c vendor/unipaste/strbuf.c vendor/unipaste/plugin_builtin.c -o clipbridge-arm64 -s -ldl
           tar -czvf clipbridge-v${VERSION}-linux-arm64.tar.gz -C . clipbridge-arm64 clipbridge.1 README.md LICENSE
 
       - name: Build Windows x64 Binaries (Setup & Portable)

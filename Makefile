@@ -88,7 +88,7 @@ CC_ARM64 ?= aarch64-linux-gnu-gcc
 deb-arm64:
 	@T=$$(mktemp -d); \
 	mkdir -p $$T/DEBIAN $$T/usr/bin $$T/usr/share/man/man1 $$T/usr/share/applications $$T/usr/share/icons/hicolor/scalable/apps $$T/usr/share/pixmaps; \
-	$(CC_ARM64) $(CFLAGS) -std=c99 -pedantic -Wall -Wextra -Os -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"$(VERSION)\" -I$(VENDOR_UNIPASTE) clipbridge.c i18n.c platform_posix.c $(UNIPASTE_SRC) -o $$T/usr/bin/clipbridge -s; \
+	$(CC_ARM64) $(CFLAGS) -std=c99 -pedantic -Wall -Wextra -Os -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_C_SOURCE=200809L -DVERSION=\"$(VERSION)\" -I$(VENDOR_UNIPASTE) clipbridge.c i18n.c platform_posix.c $(UNIPASTE_SRC) -o $$T/usr/bin/clipbridge -s -ldl || { rm -rf $$T; exit 1; }; \
 	sed "s/VERSION/$(VERSION)/g" < clipbridge.1 > $$T/usr/share/man/man1/clipbridge.1; \
 	cp packaging/clipbridge.desktop $$T/usr/share/applications/; \
 	cp assets/clipbridge.svg $$T/usr/share/icons/hicolor/scalable/apps/; \

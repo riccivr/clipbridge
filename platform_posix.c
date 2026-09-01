@@ -124,25 +124,263 @@ clipboard_read_html(char **out_html, size_t *out_len)
 	return 0;
 }
 
-int
-clipboard_write_text(const char *text, size_t len)
+static int
+write_via_cmd(const char *cmd, const char *data, size_t len)
 {
-	const char *cmd;
 	FILE *fp;
 	size_t written;
 
-	if (!text || len == 0)
-		return 0;
-
-	cmd = get_write_text_cmd();
+	if (!cmd || !data || len == 0)
+		return -1;
 	fp = popen(cmd, "w");
 	if (!fp)
 		return -1;
+	written = fwrite(data, 1, len, fp);
+	return (pclose(fp) == 0 && written == len) ? 0 : -1;
+}
 
-	written = fwrite(text, 1, len, fp);
-	pclose(fp);
+static int
+write_text_fallback(const char *text, size_t len)
+{
+	return write_via_cmd(get_write_text_cmd(), text, len);
+}
 
-	return (written == len) ? 0 : -1;
+/*
+ * X11 clipboard holder child. Owns CLIPBOARD and answers SelectionRequest
+ * for both UTF8/text/plain and text/html so the rich slot survives a write.
+ * Mirrors how xclip -silent keeps the selection alive after the parent exits.
+ */
+#define X_SELECTION_CLEAR   29
+#define X_SELECTION_REQUEST 30
+#define X_SELECTION_NOTIFY  31
+#define X_CURRENT_TIME      0UL
+#define X_PROP_REPLACE      0
+#define X_XA_ATOM           4UL
+#define X_XA_STRING         31UL
+#define X_NO_EVENT_MASK     0L
+
+struct xsel_req {
+	int type;
+	unsigned long serial;
+	int send_event;
+	void *display;
+	unsigned long owner;
+	unsigned long requestor;
+	unsigned long selection;
+	unsigned long target;
+	unsigned long property;
+	unsigned long time;
+};
+
+struct xsel_ev {
+	int type;
+	unsigned long serial;
+	int send_event;
+	void *display;
+	unsigned long requestor;
+	unsigned long selection;
+	unsigned long target;
+	unsigned long property;
+	unsigned long time;
+};
+
+static void
+x11_send_sel_notify(void *dpy, int (*pXSendEvent)(void *, unsigned long, int, long, void *),
+	int (*pXFlush)(void *), struct xsel_req *req, unsigned long property)
+{
+	struct xsel_ev ev;
+
+	memset(&ev, 0, sizeof(ev));
+	ev.type = X_SELECTION_NOTIFY;
+	ev.display = dpy;
+	ev.requestor = req->requestor;
+	ev.selection = req->selection;
+	ev.target = req->target;
+	ev.property = property;
+	ev.time = req->time;
+	pXSendEvent(dpy, req->requestor, 1, X_NO_EVENT_MASK, &ev);
+	pXFlush(dpy);
+}
+
+static int
+x11_offer_html_and_text(const char *text, size_t text_len, const char *html, size_t html_len)
+{
+	void *libx11 = NULL;
+	void *dpy = NULL;
+	unsigned long win, clipboard, targets, utf8, text_atom, plain, plain_cs, html_atom, xa_atom, xa_string;
+	int screen;
+	pid_t child;
+	unsigned char evbuf[256];
+
+	void *(*pXOpenDisplay)(const char *);
+	int (*pXCloseDisplay)(void *);
+	unsigned long (*pXInternAtom)(void *, const char *, int);
+	int (*pXDefaultScreen)(void *);
+	unsigned long (*pXRootWindow)(void *, int);
+	unsigned long (*pXCreateSimpleWindow)(void *, unsigned long, int, int, unsigned int, unsigned int,
+		unsigned int, unsigned long, unsigned long);
+	int (*pXSetSelectionOwner)(void *, unsigned long, unsigned long, unsigned long);
+	unsigned long (*pXGetSelectionOwner)(void *, unsigned long);
+	int (*pXChangeProperty)(void *, unsigned long, unsigned long, unsigned long, int, int, const void *, int);
+	int (*pXSendEvent)(void *, unsigned long, int, long, void *);
+	int (*pXFlush)(void *);
+	int (*pXPending)(void *);
+	int (*pXNextEvent)(void *, void *);
+	int (*pXDestroyWindow)(void *, unsigned long);
+
+	if (!getenv("DISPLAY") || !text || text_len == 0)
+		return -1;
+
+	libx11 = dlopen("libX11.so.6", RTLD_LAZY);
+	if (!libx11)
+		return -1;
+
+	memcpy(&pXOpenDisplay, (void *[]){ dlsym(libx11, "XOpenDisplay") }, sizeof(pXOpenDisplay));
+	memcpy(&pXCloseDisplay, (void *[]){ dlsym(libx11, "XCloseDisplay") }, sizeof(pXCloseDisplay));
+	memcpy(&pXInternAtom, (void *[]){ dlsym(libx11, "XInternAtom") }, sizeof(pXInternAtom));
+	memcpy(&pXDefaultScreen, (void *[]){ dlsym(libx11, "XDefaultScreen") }, sizeof(pXDefaultScreen));
+	memcpy(&pXRootWindow, (void *[]){ dlsym(libx11, "XRootWindow") }, sizeof(pXRootWindow));
+	memcpy(&pXCreateSimpleWindow, (void *[]){ dlsym(libx11, "XCreateSimpleWindow") }, sizeof(pXCreateSimpleWindow));
+	memcpy(&pXSetSelectionOwner, (void *[]){ dlsym(libx11, "XSetSelectionOwner") }, sizeof(pXSetSelectionOwner));
+	memcpy(&pXGetSelectionOwner, (void *[]){ dlsym(libx11, "XGetSelectionOwner") }, sizeof(pXGetSelectionOwner));
+	memcpy(&pXChangeProperty, (void *[]){ dlsym(libx11, "XChangeProperty") }, sizeof(pXChangeProperty));
+	memcpy(&pXSendEvent, (void *[]){ dlsym(libx11, "XSendEvent") }, sizeof(pXSendEvent));
+	memcpy(&pXFlush, (void *[]){ dlsym(libx11, "XFlush") }, sizeof(pXFlush));
+	memcpy(&pXPending, (void *[]){ dlsym(libx11, "XPending") }, sizeof(pXPending));
+	memcpy(&pXNextEvent, (void *[]){ dlsym(libx11, "XNextEvent") }, sizeof(pXNextEvent));
+	memcpy(&pXDestroyWindow, (void *[]){ dlsym(libx11, "XDestroyWindow") }, sizeof(pXDestroyWindow));
+
+	if (!pXOpenDisplay || !pXCloseDisplay || !pXInternAtom || !pXDefaultScreen || !pXRootWindow ||
+	    !pXCreateSimpleWindow || !pXSetSelectionOwner || !pXGetSelectionOwner || !pXChangeProperty ||
+	    !pXSendEvent || !pXFlush || !pXPending || !pXNextEvent || !pXDestroyWindow) {
+		dlclose(libx11);
+		return -1;
+	}
+
+	child = fork();
+	if (child < 0) {
+		dlclose(libx11);
+		return -1;
+	}
+	if (child > 0) {
+		/* Parent: holder lives until another owner takes CLIPBOARD. */
+		dlclose(libx11);
+		return 0;
+	}
+
+	/* Child clipboard owner. */
+	signal(SIGINT, SIG_IGN);
+	signal(SIGTERM, SIG_DFL);
+	if (setsid() < 0) {
+		/* still try to hold the selection */
+	}
+
+	dpy = pXOpenDisplay(NULL);
+	if (!dpy)
+		_exit(1);
+
+	screen = pXDefaultScreen(dpy);
+	win = pXCreateSimpleWindow(dpy, pXRootWindow(dpy, screen), 0, 0, 1, 1, 0, 0, 0);
+	clipboard = pXInternAtom(dpy, "CLIPBOARD", 0);
+	targets = pXInternAtom(dpy, "TARGETS", 0);
+	utf8 = pXInternAtom(dpy, "UTF8_STRING", 0);
+	text_atom = pXInternAtom(dpy, "TEXT", 0);
+	plain = pXInternAtom(dpy, "text/plain", 0);
+	plain_cs = pXInternAtom(dpy, "text/plain;charset=utf-8", 0);
+	html_atom = pXInternAtom(dpy, "text/html", 0);
+	xa_atom = X_XA_ATOM;
+	xa_string = X_XA_STRING;
+
+	pXSetSelectionOwner(dpy, clipboard, win, X_CURRENT_TIME);
+	pXFlush(dpy);
+	if (pXGetSelectionOwner(dpy, clipboard) != win) {
+		pXDestroyWindow(dpy, win);
+		pXCloseDisplay(dpy);
+		_exit(1);
+	}
+
+	while (1) {
+		struct xsel_req *req;
+
+		pXNextEvent(dpy, evbuf);
+		req = (struct xsel_req *)evbuf;
+
+		if (req->type == X_SELECTION_CLEAR)
+			break;
+
+		if (req->type != X_SELECTION_REQUEST || req->owner != win)
+			continue;
+
+		if (req->target == targets) {
+			unsigned long list[8];
+			int n = 0;
+
+			list[n++] = targets;
+			list[n++] = utf8;
+			list[n++] = text_atom;
+			list[n++] = plain;
+			list[n++] = plain_cs;
+			list[n++] = xa_string;
+			if (html && html_len > 0)
+				list[n++] = html_atom;
+			pXChangeProperty(dpy, req->requestor,
+				req->property ? req->property : targets,
+				xa_atom, 32, X_PROP_REPLACE, list, n);
+			x11_send_sel_notify(dpy, pXSendEvent, pXFlush, req,
+				req->property ? req->property : targets);
+		} else if (req->target == utf8 || req->target == text_atom ||
+		    req->target == plain || req->target == plain_cs || req->target == xa_string) {
+			unsigned long prop = req->property ? req->property : req->target;
+			pXChangeProperty(dpy, req->requestor, prop, req->target == xa_string ? xa_string : utf8,
+				8, X_PROP_REPLACE, text, (int)text_len);
+			x11_send_sel_notify(dpy, pXSendEvent, pXFlush, req, prop);
+		} else if (html && html_len > 0 && req->target == html_atom) {
+			unsigned long prop = req->property ? req->property : req->target;
+			pXChangeProperty(dpy, req->requestor, prop, html_atom,
+				8, X_PROP_REPLACE, html, (int)html_len);
+			x11_send_sel_notify(dpy, pXSendEvent, pXFlush, req, prop);
+		} else {
+			x11_send_sel_notify(dpy, pXSendEvent, pXFlush, req, 0);
+		}
+	}
+
+	pXDestroyWindow(dpy, win);
+	pXCloseDisplay(dpy);
+	_exit(0);
+	return 0;
+}
+
+static int
+clipboard_write_text_and_preserve_html(const char *text, size_t text_len, const char *html, size_t html_len)
+{
+	int wrote = -1;
+
+	if (!text || text_len == 0)
+		return 0;
+
+	/*
+	 * Wayland native clients read the Wayland clipboard (single type via
+	 * wl-copy). If DISPLAY is also set, own the X11 CLIPBOARD with both
+	 * text and HTML so XWayland / xclip clients keep the rich slot.
+	 */
+	if (getenv("WAYLAND_DISPLAY"))
+		wrote = write_via_cmd("wl-copy -t text/plain", text, text_len);
+
+	if (getenv("DISPLAY") && html && html_len > 0) {
+		if (x11_offer_html_and_text(text, text_len, html, html_len) == 0)
+			wrote = 0;
+	}
+
+	if (wrote == 0)
+		return 0;
+
+	return write_text_fallback(text, text_len);
+}
+
+int
+clipboard_write_text(const char *text, size_t len)
+{
+	return clipboard_write_text_and_preserve_html(text, len, NULL, 0);
 }
 
 int
@@ -159,14 +397,11 @@ clipboard_sync_once(const struct config *cfg)
 
 	strbuf_init(&out_sb, html_len * 2);
 	ret = unipaste_process_to_strbuf(html, html_len, &out_sb, cfg);
+
+	if (ret == 0 && out_sb.len > 0)
+		clipboard_write_text_and_preserve_html(out_sb.data, out_sb.len, html, html_len);
+
 	free(html);
-
-	if (ret == 0 && out_sb.len > 0) {
-		clipboard_write_text(out_sb.data, out_sb.len);
-		strbuf_free(&out_sb);
-		return 0;
-	}
-
 	strbuf_free(&out_sb);
 	return ret;
 }
@@ -227,7 +462,7 @@ sync_clipboard_if_changed(const struct config *cfg, char **last_html, size_t *la
 		struct strbuf out_sb;
 		strbuf_init(&out_sb, curr_len * 2);
 		if (unipaste_process_to_strbuf(curr_html, curr_len, &out_sb, cfg) == 0 && out_sb.len > 0) {
-			clipboard_write_text(out_sb.data, out_sb.len);
+			clipboard_write_text_and_preserve_html(out_sb.data, out_sb.len, curr_html, curr_len);
 			printf("clipbridge: [synced] formatted %zu bytes of rich text -> plain text\n", curr_len);
 			fflush(stdout);
 		}
@@ -487,10 +722,30 @@ watch_clipnotify(const struct config *cfg, char **last_html, size_t *last_len)
 	sync_clipboard_if_changed(cfg, last_html, last_len);
 
 	while (running) {
-		int st = system("clipnotify");
-		if (!running)
+		pid_t child;
+		int st = 0;
+
+		child = fork();
+		if (child < 0)
+			return -1;
+		if (child == 0) {
+			execlp("clipnotify", "clipnotify", (char *)NULL);
+			_exit(127);
+		}
+
+		while (running) {
+			pid_t w = waitpid(child, &st, 0);
+			if (w < 0 && errno == EINTR)
+				continue;
 			break;
-		if (st != 0)
+		}
+
+		if (!running) {
+			kill(child, SIGTERM);
+			waitpid(child, NULL, 0);
+			break;
+		}
+		if (WIFEXITED(st) && WEXITSTATUS(st) == 127)
 			return -1;
 		sync_clipboard_if_changed(cfg, last_html, last_len);
 	}

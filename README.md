@@ -20,7 +20,7 @@ How clipbridge Works
 Features
 --------
 * **Self-contained engine**: In-tree vendored `unipaste` C99 parsing and formatting engine (`vendor/unipaste/`).
-* **Format preservation**: Re-offers both rich HTML and formatted plain text simultaneously on Windows (`CF_UNICODETEXT` + `HTML Format`) and macOS (`NSPasteboardTypeString` + `NSPasteboardTypeHTML`). On Linux, updates the plain-text selection via `wl-copy`/`xclip`.
+* **Format preservation**: Re-offers both rich HTML and formatted plain text simultaneously on Windows (`CF_UNICODETEXT` + `HTML Format`) and macOS (`NSPasteboardTypeString` + `NSPasteboardTypeHTML`). On Linux X11/XWayland, an X11 selection owner re-offers `UTF8_STRING` plus `text/html`. Pure Wayland still writes `text/plain` through `wl-copy` (one MIME type per offer).
 * **Privacy protection**: Automatically skips clipboard updates marked private by password managers (`Clipboard Viewer Ignore`, `CanIncludeInClipboardHistory`, `CanUploadToCloudStore`, `x-kde-passwordManagerHint`, and `org.nspasteboard.ConcealedType` from 1Password, Bitwarden, KeePassXC, and Apple Keychain).
 * **Platform backends**:
   * **Windows**: Native pure Win32 API (`AddClipboardFormatListener`, tray icon, registry persistence, hotkeys, 0 external dependencies).
