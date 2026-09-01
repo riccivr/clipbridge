@@ -1131,27 +1131,31 @@ unipaste_process_to_strbuf(const char *input, size_t len, struct strbuf *out, co
 	if (!input || !out || !cfg)
 		return 1;
 
+	/* Allocate a null-terminated working buffer for safe parsing of raw binary/fuzzer inputs */
+	alloc_input = malloc(len + 1);
+	if (!alloc_input)
+		return 1;
+	memcpy(alloc_input, input, len);
+	alloc_input[len] = '\0';
+	input = alloc_input;
+
 	/* Strip Windows CF_HTML clipboard headers if present */
 	strip_windows_cf_html_header(&input, &len);
 
 	/* Auto-detect raw TSV grids from Excel / Google Sheets */
 	if (is_tsv_grid(input, len)) {
-		return process_tsv_to_strbuf(input, len, out, cfg);
+		int res = process_tsv_to_strbuf(input, len, out, cfg);
+		free(alloc_input);
+		return res;
 	}
 
 	/* Plugin hook: sanitize input before formatting if compiled in */
 	sanitized = sanitize_html(input, len);
 	if (sanitized) {
+		free(alloc_input);
 		alloc_input = sanitized;
 		input = alloc_input;
 		len = strlen(alloc_input);
-	} else {
-		alloc_input = malloc(len + 1);
-		if (!alloc_input)
-			return 1;
-		memcpy(alloc_input, input, len);
-		alloc_input[len] = '\0';
-		input = alloc_input;
 	}
 
 	memset(&st, 0, sizeof(st));
