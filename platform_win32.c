@@ -742,10 +742,37 @@ clipboard_watch(const struct config *cfg)
 		HWND existing = FindWindowA("ClipBridgeMonitorClass", "ClipBridge");
 		if (existing) {
 			PostMessageA(existing, WM_COMMAND, ID_TRAY_ABOUT, 0);
+			if (hMutex)
+				CloseHandle(hMutex);
+			return 0;
 		}
-		if (hMutex)
-			CloseHandle(hMutex);
-		return 0;
+		/* Updater relaunch race: prior instance exiting - window gone but
+		 * mutex handle not released until process teardown. Wait/retry. */
+		{
+			int i;
+			for (i = 0; i < 50; i++) {
+				if (hMutex) {
+					CloseHandle(hMutex);
+					hMutex = NULL;
+				}
+				Sleep(100);
+				hMutex = CreateMutexA(NULL, TRUE, "Local\\ClipBridge_SingleInstance_Mutex_Ricci");
+				if (GetLastError() != ERROR_ALREADY_EXISTS)
+					break;
+				existing = FindWindowA("ClipBridgeMonitorClass", "ClipBridge");
+				if (existing) {
+					PostMessageA(existing, WM_COMMAND, ID_TRAY_ABOUT, 0);
+					if (hMutex)
+						CloseHandle(hMutex);
+					return 0;
+				}
+			}
+			if (GetLastError() == ERROR_ALREADY_EXISTS) {
+				if (hMutex)
+					CloseHandle(hMutex);
+				return 0;
+			}
+		}
 	}
 
 	init_win32_clipboard();
