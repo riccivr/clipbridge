@@ -19,7 +19,7 @@
 #include "i18n.h"
 
 #ifndef VERSION
-#define VERSION "1.4.0"
+#define VERSION "1.4.1"
 #endif
 
 #define WIDE2(x) L##x
