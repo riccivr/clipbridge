@@ -61,7 +61,14 @@ static const char *strings_en[STR_COUNT] = {
 	[STR_INSTALL_SUCCESS_MSG]  = "ClipBridge has been installed successfully!\n\n"
 	                             "• You can now launch ClipBridge anytime from your Windows Start Menu.\n"
 	                             "• ClipBridge is now active in your System Tray.\n"
-	                             "• Press Ctrl+Alt+V anywhere to paste clean formatted text."
+	                             "• Press Ctrl+Alt+V anywhere to paste clean formatted text.",
+	[STR_CHECK_UPDATES]        = "Check for updates...",
+	[STR_AUTO_UPDATE]           = "Automatically check for updates",
+	[STR_UPDATE_TITLE]          = "ClipBridge Update",
+	[STR_UPDATE_AVAILABLE]      = "A new version (%s) is available.\n\nDownload and install it now?",
+	[STR_UPDATE_NONE]           = "ClipBridge is up to date.",
+	[STR_UPDATE_FAILED]         = "Could not check for updates.\nPlease try again later.",
+	[STR_UPDATE_PROGRESS]       = "Downloading update..."
 };
 
 /* Spanish String Table */
@@ -114,7 +121,14 @@ static const char *strings_es[STR_COUNT] = {
 	[STR_INSTALL_SUCCESS_MSG]  = "¡ClipBridge se ha instalado correctamente!\n\n"
 	                             "• Ahora puedes iniciar ClipBridge en cualquier momento desde el Menú Inicio.\n"
 	                             "• ClipBridge está activo en la bandeja del sistema.\n"
-	                             "• Pulsa Ctrl+Alt+V en cualquier lugar para pegar texto limpio y formateado."
+	                             "• Pulsa Ctrl+Alt+V en cualquier lugar para pegar texto limpio y formateado.",
+	[STR_CHECK_UPDATES]        = "Buscar actualizaciones...",
+	[STR_AUTO_UPDATE]           = "Buscar actualizaciones automáticamente",
+	[STR_UPDATE_TITLE]          = "Actualización de ClipBridge",
+	[STR_UPDATE_AVAILABLE]      = "Hay una nueva versión (%s) disponible.\n\n¿Descargar e instalar ahora?",
+	[STR_UPDATE_NONE]           = "ClipBridge está actualizado.",
+	[STR_UPDATE_FAILED]         = "No se pudo buscar actualizaciones.\nInténtalo de nuevo más tarde.",
+	[STR_UPDATE_PROGRESS]       = "Descargando actualización..."
 };
 
 static enum lang_id
