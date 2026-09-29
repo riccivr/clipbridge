@@ -9,6 +9,7 @@
 #include "clipbridge.h"
 #include "unipaste.h"
 #include "i18n.h"
+#include "update_win32.h"
 
 #define WM_TRAYICON (WM_USER + 1)
 #define ID_TRAY_PASTE_NOW        1001
@@ -30,6 +31,10 @@
 #define ID_TRAY_MODE_JIRA        1017
 #define ID_TRAY_STRIP_TRACKING   1018
 #define ID_TRAY_PAUSE_15M        1019
+#define ID_TRAY_CHECK_UPDATE     1020
+#define ID_TRAY_AUTO_UPDATE      1021
+
+#define ID_TIMER_AUTO_UPDATE     3001
 
 #define ID_HOTKEY_CTRL_ALT_V     2001
 #define ID_HOTKEY_WIN_ALT_V      2002
@@ -534,6 +539,9 @@ show_tray_menu(HWND hwnd)
 
 	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
 	append_menu_u8(hMenu, (is_startup_enabled() ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_STARTUP, i18n_get(STR_STARTUP));
+	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
+	append_menu_u8(hMenu, MF_STRING, ID_TRAY_CHECK_UPDATE, i18n_get(STR_CHECK_UPDATES));
+	append_menu_u8(hMenu, (update_auto_enabled() ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_AUTO_UPDATE, i18n_get(STR_AUTO_UPDATE));
 	append_menu_u8(hMenu, MF_STRING, ID_TRAY_ABOUT, i18n_get(STR_ABOUT_MENU));
 	append_menu_u8(hMenu, MF_SEPARATOR, 0, NULL);
 	append_menu_u8(hMenu, MF_STRING, ID_TRAY_EXIT, i18n_get(STR_EXIT));
@@ -670,6 +678,12 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		case ID_TRAY_STARTUP:
 			set_startup_enabled(!is_startup_enabled());
 			break;
+		case ID_TRAY_CHECK_UPDATE:
+			update_check(hwnd, &nid, 0);
+			break;
+		case ID_TRAY_AUTO_UPDATE:
+			update_set_auto_enabled(!update_auto_enabled());
+			break;
 		case ID_TRAY_ABOUT: {
 			wchar_t title[128];
 			wchar_t body[1024];
@@ -685,7 +699,15 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		return 0;
 	}
 
+	case WM_TIMER:
+		if (wParam == ID_TIMER_AUTO_UPDATE) {
+			KillTimer(hwnd, ID_TIMER_AUTO_UPDATE);
+			update_maybe_auto_check(hwnd, &nid);
+		}
+		return 0;
+
 	case WM_DESTROY:
+		KillTimer(hwnd, ID_TIMER_AUTO_UPDATE);
 		UnregisterHotKey(hwnd, ID_HOTKEY_CTRL_ALT_V);
 		UnregisterHotKey(hwnd, ID_HOTKEY_WIN_ALT_V);
 		Shell_NotifyIconW(NIM_DELETE, &nid);
@@ -762,6 +784,10 @@ clipboard_watch(const struct config *cfg)
 	MultiByteToWideChar(CP_UTF8, 0, tip, -1, nid.szTip, sizeof(nid.szTip)/sizeof(nid.szTip[0]));
 
 	Shell_NotifyIconW(NIM_ADD, &nid);
+
+	/* Quiet auto-update check ~once/day (deferred so tray appears first) */
+	if (update_auto_enabled())
+		SetTimer(g_hwnd, ID_TIMER_AUTO_UPDATE, 2500, NULL);
 
 	while (GetMessage(&msg, NULL, 0, 0) > 0) {
 		TranslateMessage(&msg);

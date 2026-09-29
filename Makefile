@@ -58,11 +58,11 @@ clipbridge: $(OBJ)
 	$(CC) -o $@ $(OBJ) $(LDFLAGS)
 
 clean:
-	rm -f clipbridge $(OBJ) plugin.o platform_macos.o platform_posix.o platform_win32.o clipbridge_res.o installer_res.o clipbridge.exe clipbridge-portable.exe clipbridge-setup.exe clipbridge-$(VERSION).tar.gz
+	rm -f clipbridge $(OBJ) plugin.o platform_macos.o platform_posix.o platform_win32.o update_win32.o clipbridge_res.o installer_res.o clipbridge.exe clipbridge-portable.exe clipbridge-setup.exe clipbridge-$(VERSION).tar.gz
 
 dist: clean
 	mkdir -p clipbridge-$(VERSION)/scripts clipbridge-$(VERSION)/packaging clipbridge-$(VERSION)/assets clipbridge-$(VERSION)/vendor/unipaste clipbridge-$(VERSION)/tests
-	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.rc installer.rc clipbridge.1 arg.h clipbridge.h i18n.h clipbridge.c i18n.c installer_win32.c platform_posix.c platform_win32.c platform_macos.m scripts packaging assets vendor tests clipbridge-$(VERSION)
+	cp -R LICENSE Makefile README.md config.mk Info.plist clipbridge.rc installer.rc clipbridge.1 arg.h clipbridge.h i18n.h update_win32.h clipbridge.c i18n.c installer_win32.c update_win32.c platform_posix.c platform_win32.c platform_macos.m scripts packaging assets vendor tests clipbridge-$(VERSION)
 	rm -rf clipbridge-$(VERSION)/packaging/aur
 	tar -cf clipbridge-$(VERSION).tar clipbridge-$(VERSION)
 	gzip clipbridge-$(VERSION).tar
@@ -105,7 +105,7 @@ CC_WIN32 ?= x86_64-w64-mingw32-gcc
 WINDRES  ?= x86_64-w64-mingw32-windres
 exe:
 	$(WINDRES) clipbridge.rc -O coff -o clipbridge_res.o
-	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows clipbridge.c platform_win32.c i18n.c clipbridge_res.o $(UNIPASTE_SRC) -o clipbridge-portable.exe -s -luser32 -lshell32 -ladvapi32 -lcomctl32
+	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows clipbridge.c platform_win32.c update_win32.c i18n.c clipbridge_res.o $(UNIPASTE_SRC) -o clipbridge-portable.exe -s -luser32 -lshell32 -ladvapi32 -lcomctl32 -lwinhttp
 	$(WINDRES) installer.rc -O coff -o installer_res.o
 	$(CC_WIN32) $(CFLAGS) -D_WIN32 -mwindows -municode installer_win32.c i18n.c installer_res.o -o clipbridge-setup.exe -s -luser32 -lshell32 -ladvapi32 -lole32 -luuid -lcomctl32
 	rm -f clipbridge.exe
