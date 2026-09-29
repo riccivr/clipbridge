@@ -54,7 +54,7 @@ test_not_contains() {
 
 echo "Running clipbridge integration test suite..."
 
-test_contains "CLI: Version" "" "clipbridge-1.4.0" "-v"
+test_contains "CLI: Version" "" "clipbridge-1.4.1" "-v"
 test_contains "CLI: Help" "" "usage:" "-h"
 test_contains "CLI: Unknown flag" "" "usage:" "-z"
 
