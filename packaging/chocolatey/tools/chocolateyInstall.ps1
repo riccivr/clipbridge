@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop';
 $packageName = 'clipbridge'
 $toolsDir = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
 $url64 = 'https://github.com/riccivr/clipbridge/releases/download/v1.4.1/clipbridge-v1.4.1-windows-x64.zip'
-$checksum64 = 'e4e4a433cf628b5fd3d93088293f418f9ce9d3b8ab7113294ebfc59d59a903b1'
+$checksum64 = 'a1da6c32f07466077db05b8e9865a67929569745d372316e47ae4d06892e8dba1'
 
 $packageArgs = @{
   packageName   = $packageName
