@@ -682,7 +682,7 @@ apply_update(HWND hwnd, NOTIFYICONDATAW *nid, const struct release_info *info)
 	wchar_t new_path[MAX_PATH];
 	wchar_t zip_path[MAX_PATH];
 	wchar_t dir[MAX_PATH];
-	wchar_t cmd[MAX_PATH * 4];
+	wchar_t cmd[MAX_PATH * 8];
 	wchar_t *slash;
 	char msg[512];
 	wchar_t wmsg[512], wtitle[128];
@@ -734,10 +734,31 @@ apply_update(HWND hwnd, NOTIFYICONDATAW *nid, const struct release_info *info)
 	if (nid)
 		Shell_NotifyIconW(NIM_DELETE, nid);
 
-	/* Delayed replace: wait briefly, move .new over live exe, relaunch -w */
-	_snwprintf(cmd, sizeof(cmd) / sizeof(cmd[0]),
-		L"/C ping 127.0.0.1 -n 2 > nul & move /Y \"%ls\" \"%ls\" & start \"\" \"%ls\" -w",
-		new_path, exe_path, exe_path);
+	/* Delayed replace using this module basename (e.g. clipbridge-portable.exe):
+	 * wait for exit, move .new over live exe, wait until that image is gone
+	 * (single-instance mutex released), then relaunch -w. */
+	{
+		wchar_t *base;
+		wchar_t proc[MAX_PATH];
+		wchar_t *dot;
+
+		base = wcsrchr(exe_path, L'\\');
+		base = base ? base + 1 : exe_path;
+		wcsncpy(proc, base, MAX_PATH - 1);
+		proc[MAX_PATH - 1] = L'\0';
+		dot = wcsrchr(proc, L'.');
+		if (dot && _wcsicmp(dot, L".exe") == 0)
+			*dot = L'\0';
+
+		_snwprintf(cmd, sizeof(cmd) / sizeof(cmd[0]),
+			L"/C ping 127.0.0.1 -n 2 >nul & move /Y \"%ls\" \"%ls\" & "
+			L"powershell -NoProfile -WindowStyle Hidden -Command "
+			L"\"$p='%ls'; for($i=0;$i -lt 50;$i++){"
+			L"if(-not (Get-Process -Name $p -ErrorAction SilentlyContinue)){break};"
+			L"Start-Sleep -Milliseconds 100}; "
+			L"Start-Process -LiteralPath '%ls' -ArgumentList '-w'\"",
+			new_path, exe_path, proc, exe_path);
+	}
 	ShellExecuteW(NULL, L"open", L"cmd.exe", cmd, dir[0] ? dir : NULL, SW_HIDE);
 	PostQuitMessage(0);
 	return 1;
