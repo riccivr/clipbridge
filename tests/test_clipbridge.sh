@@ -66,6 +66,11 @@ test_contains "HTML: Keep tracking" "$HTML_SAMPLE" "utm_source=slack" "-p -m mar
 test_contains "HTML: Table in Markdown" "$HTML_SAMPLE" "| Core Engine | **Ready** |" "-p -m markdown"
 test_contains "HTML: Slack heading" "$HTML_SAMPLE" "*Release Plan*" "-p -m slack"
 test_contains "HTML: Slack link" "$HTML_SAMPLE" "<https://example.com|dashboard>" "-p -m slack"
+test_contains "HTML: WhatsApp heading" "$HTML_SAMPLE" "*Release Plan*" "-p -m whatsapp"
+FENCE='```'
+test_contains "HTML: WhatsApp fenced table" "$HTML_SAMPLE" "$FENCE" "-p -m whatsapp"
+test_contains "HTML: WhatsApp bracket link" "$HTML_SAMPLE" "dashboard (https://example.com)" "-p -m whatsapp"
+test_not_contains "HTML: WhatsApp no Slack link" "$HTML_SAMPLE" "<https://example.com|dashboard>" "-p -m whatsapp"
 test_contains "HTML: Jira heading" "$HTML_SAMPLE" "h1. Release Plan" "-p -m jira"
 test_contains "HTML: Jira table header" "$HTML_SAMPLE" "|| Item || Status ||" "-p -m jira"
 test_contains "HTML: Jira link" "$HTML_SAMPLE" "[dashboard|https://example.com]" "-p -m jira"

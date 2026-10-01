@@ -584,7 +584,7 @@ table_render(struct table *t, struct strbuf *out, const struct config *cfg)
 		return;
 	}
 
-	if (cfg->mode == MODE_SLACK) {
+	if (cfg->mode == MODE_SLACK || cfg->mode == MODE_WHATSAPP) {
 		strbuf_puts(out, "```\n");
 		render_grid(t, out, cfg->unicode_tables);
 		strbuf_puts(out, "```\n");

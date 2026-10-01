@@ -29,6 +29,7 @@
 #define ID_TRAY_EXIT             1015
 #define ID_TRAY_MODE_SLACK       1016
 #define ID_TRAY_MODE_JIRA        1017
+#define ID_TRAY_MODE_WHATSAPP    1022
 #define ID_TRAY_STRIP_TRACKING   1018
 #define ID_TRAY_PAUSE_15M        1019
 #define ID_TRAY_CHECK_UPDATE     1020
@@ -520,6 +521,7 @@ show_tray_menu(HWND hwnd)
 	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_PLAIN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_PLAIN, i18n_get(STR_MODE_PLAIN));
 	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_MARKDOWN ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_MARKDOWN, i18n_get(STR_MODE_MARKDOWN));
 	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_SLACK ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_SLACK, i18n_get(STR_MODE_SLACK));
+	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_WHATSAPP ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_WHATSAPP, i18n_get(STR_MODE_WHATSAPP));
 	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_JIRA ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_JIRA, i18n_get(STR_MODE_JIRA));
 	append_menu_u8(hModeMenu, (current_cfg.mode == MODE_TERMINAL ? MF_CHECKED : MF_UNCHECKED) | MF_STRING, ID_TRAY_MODE_TERMINAL, i18n_get(STR_MODE_TERMINAL));
 	append_menu_u8(hMenu, MF_POPUP, (UINT_PTR)hModeMenu, i18n_get(STR_OUTPUT_MODE));
@@ -632,6 +634,10 @@ WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			break;
 		case ID_TRAY_MODE_SLACK:
 			current_cfg.mode = MODE_SLACK;
+			save_settings();
+			break;
+		case ID_TRAY_MODE_WHATSAPP:
+			current_cfg.mode = MODE_WHATSAPP;
 			save_settings();
 			break;
 		case ID_TRAY_MODE_JIRA:
