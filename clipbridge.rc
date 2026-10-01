@@ -18,12 +18,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Ricardo Veronese Ricci"
             VALUE "FileDescription",  "Universal Clipboard Daemon"
-            VALUE "FileVersion",      "1.4.1.0"
+            VALUE "FileVersion",      "1.5.0.0"
             VALUE "InternalName",     "clipbridge"
             VALUE "LegalCopyright",   "Copyright (C) 2026 Ricardo Veronese Ricci. MIT License."
             VALUE "OriginalFilename", "clipbridge.exe"
             VALUE "ProductName",      "ClipBridge"
-            VALUE "ProductVersion",   "1.4.1.0"
+            VALUE "ProductVersion",   "1.5.0.0"
         END
     END
     BLOCK "VarFileInfo"
