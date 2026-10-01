@@ -7,6 +7,14 @@
 #include "plugin.h"
 
 /* Safe string duplicate */
+
+/* Slack and WhatsApp share chat markup (*bold* _italic_ ~strike~ and fences). */
+static int
+mode_is_chat(enum output_mode m)
+{
+	return m == MODE_SLACK || m == MODE_WHATSAPP;
+}
+
 static char *
 xstrdup(const char *s)
 {
@@ -348,6 +356,7 @@ flush_heading(struct parser_state *st)
 		strbuf_puts(&st->outbuf, st->heading_text.data);
 		break;
 	case MODE_SLACK:
+	case MODE_WHATSAPP:
 		strbuf_putc(&st->outbuf, '*');
 		strbuf_puts(&st->outbuf, st->heading_text.data);
 		strbuf_putc(&st->outbuf, '*');
@@ -618,14 +627,14 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 	} else if (tag_is(name, "pre")) {
 		st->pre_depth++;
 		emit_newlines(st, 2);
-		if (st->cfg->mode == MODE_MARKDOWN || st->cfg->mode == MODE_SLACK || st->cfg->mode == MODE_JIRA) {
+		if (st->cfg->mode == MODE_MARKDOWN || mode_is_chat(st->cfg->mode) || st->cfg->mode == MODE_JIRA) {
 			const char *lang = extract_code_language(tag_str, attr_val, sizeof(attr_val));
 			if (lang && *lang) {
 				if (st->cfg->mode == MODE_JIRA) {
 					strbuf_puts(&st->outbuf, "{code:");
 					strbuf_puts(&st->outbuf, lang);
 					strbuf_puts(&st->outbuf, "}\n");
-				} else if (st->cfg->mode == MODE_SLACK) {
+				} else if (mode_is_chat(st->cfg->mode)) {
 					strbuf_puts(&st->outbuf, "```\n");
 				} else {
 					strbuf_puts(&st->outbuf, "```");
@@ -661,7 +670,7 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 				}
 			}
 		} else if (!st->pre_depth) {
-			if (st->cfg->mode == MODE_MARKDOWN || st->cfg->mode == MODE_SLACK)
+			if (st->cfg->mode == MODE_MARKDOWN || mode_is_chat(st->cfg->mode))
 				emit_text(st, "`");
 			else if (st->cfg->mode == MODE_JIRA)
 				emit_text(st, "{{");
@@ -765,7 +774,7 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 		st->bold_depth++;
 		if (st->cfg->mode == MODE_MARKDOWN)
 			emit_text(st, "**");
-		else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+		else if (mode_is_chat(st->cfg->mode) && !st->table_depth)
 			emit_text(st, "*");
 		else if (st->cfg->mode == MODE_JIRA)
 			emit_text(st, "*");
@@ -775,7 +784,7 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 		st->italic_depth++;
 		if (st->cfg->mode == MODE_MARKDOWN)
 			emit_text(st, "*");
-		else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+		else if (mode_is_chat(st->cfg->mode) && !st->table_depth)
 			emit_text(st, "_");
 		else if (st->cfg->mode == MODE_JIRA)
 			emit_text(st, "_");
@@ -785,7 +794,7 @@ handle_open_tag(struct parser_state *st, const char *tag_str)
 		st->strike_depth++;
 		if (st->cfg->mode == MODE_MARKDOWN)
 			emit_text(st, "~~");
-		else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+		else if (mode_is_chat(st->cfg->mode) && !st->table_depth)
 			emit_text(st, "~");
 		else if (st->cfg->mode == MODE_JIRA)
 			emit_text(st, "-");
@@ -832,7 +841,7 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 	} else if (tag_is(name, "pre")) {
 		if (st->pre_depth > 0) {
 			st->pre_depth--;
-			if (st->cfg->mode == MODE_MARKDOWN || st->cfg->mode == MODE_SLACK) {
+			if (st->cfg->mode == MODE_MARKDOWN || mode_is_chat(st->cfg->mode)) {
 				emit_newlines(st, 1);
 				strbuf_puts(&st->outbuf, "```\n");
 				st->consecutive_newlines = 1;
@@ -849,7 +858,7 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 		if (st->code_depth > 0) {
 			st->code_depth--;
 			if (!st->pre_depth) {
-				if (st->cfg->mode == MODE_MARKDOWN || st->cfg->mode == MODE_SLACK)
+				if (st->cfg->mode == MODE_MARKDOWN || mode_is_chat(st->cfg->mode))
 					emit_text(st, "`");
 				else if (st->cfg->mode == MODE_JIRA)
 					emit_text(st, "}}");
@@ -912,7 +921,7 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 			st->bold_depth--;
 			if (st->cfg->mode == MODE_MARKDOWN)
 				emit_text(st, "**");
-			else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+			else if (mode_is_chat(st->cfg->mode) && !st->table_depth)
 				emit_text(st, "*");
 			else if (st->cfg->mode == MODE_JIRA)
 				emit_text(st, "*");
@@ -924,7 +933,7 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 			st->italic_depth--;
 			if (st->cfg->mode == MODE_MARKDOWN)
 				emit_text(st, "*");
-			else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+			else if (mode_is_chat(st->cfg->mode) && !st->table_depth)
 				emit_text(st, "_");
 			else if (st->cfg->mode == MODE_JIRA)
 				emit_text(st, "_");
@@ -936,7 +945,7 @@ handle_close_tag(struct parser_state *st, const char *tag_str)
 			st->strike_depth--;
 			if (st->cfg->mode == MODE_MARKDOWN)
 				emit_text(st, "~~");
-			else if (st->cfg->mode == MODE_SLACK && !st->table_depth)
+			else if (mode_is_chat(st->cfg->mode) && !st->table_depth)
 				emit_text(st, "~");
 			else if (st->cfg->mode == MODE_JIRA)
 				emit_text(st, "-");

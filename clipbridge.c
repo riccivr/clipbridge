@@ -173,6 +173,8 @@ main(int argc, char *argv[])
 			cfg.mode = MODE_JIRA;
 		else if (strcmp(arg, "terminal") == 0 || strcmp(arg, "ansi") == 0)
 			cfg.mode = MODE_TERMINAL;
+		else if (strcmp(arg, "whatsapp") == 0 || strcmp(arg, "wa") == 0)
+			cfg.mode = MODE_WHATSAPP;
 		else {
 			fprintf(stderr, "%s: invalid mode '%s'\n", argv0, arg);
 			usage();

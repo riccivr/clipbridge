@@ -155,7 +155,7 @@ When running `clipbridge.exe` on Windows, it runs silently in the notification t
   * **Auto-Format Default Paste (Ctrl+V)**: Optional toggle to make standard `Ctrl+V` always auto-format on every copy.
   * **Pause Formatting (15 Minutes)**: Temporarily pause automatic clipboard rewriting.
   * **Strip URL Tracking Parameters**: Strip telemetry & tracking (`utm_*`, `fbclid`, `gclid`, etc.).
-  * **Output Mode**: Plain Text, GitHub Markdown, Slack/Discord mrkdwn, Jira/Confluence, or Terminal ANSI.
+  * **Output Mode**: Plain Text, GitHub Markdown, Slack/Discord mrkdwn, WhatsApp, Jira/Confluence, or Terminal ANSI.
   * **Table Style**: ASCII Box, Unicode Grid, Markdown Pipe, TSV.
   * **Language**: Auto (System Default), English, Español.
   * **Start with Windows**: Toggle automatic startup at login.
@@ -175,7 +175,7 @@ clipbridge [-w1kpruvKh] [-m mode] [-t table] [-l link] [--uninstall] [file ...]
 * `--uninstall`: Remove desktop shortcuts, startup registrations, and configuration.
 
 ### Formatting Options
-* `-m mode`: Output mode: `plain` (default), `markdown`, `slack`, `jira`, `terminal`.
+* `-m mode`: Output mode: `plain` (default), `markdown`, `slack`, `whatsapp`, `jira`, `terminal`.
 * `-t table`: Table format: `grid` (default), `markdown`, `tsv`, `simple`.
 * `-l link`: Link format: `bracket` (default), `inline`, `text`, `footnote`.
 * `-K`: Keep URL tracking & telemetry parameters (stripped by default).

@@ -16,7 +16,8 @@ enum output_mode {
 	MODE_MARKDOWN,
 	MODE_SLACK,
 	MODE_JIRA,
-	MODE_TERMINAL
+	MODE_TERMINAL,
+	MODE_WHATSAPP
 };
 
 enum table_style {
