@@ -2,7 +2,7 @@
 # build_dmg.sh - Build macOS ClipBridge.app bundle and DMG installer disk image
 set -e
 
-VERSION=$(grep '^VERSION' config.mk 2>/dev/null | cut -d '=' -f 2 | tr -d ' ' || echo "1.4.1")
+VERSION=$(grep '^VERSION' config.mk 2>/dev/null | cut -d '=' -f 2 | tr -d ' ' || echo "1.5.0")
 APP_NAME="ClipBridge"
 DMG_NAME="ClipBridge-${VERSION}.dmg"
 BUILD_DIR="build"

@@ -19,12 +19,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName",      "Ricardo Veronese Ricci"
             VALUE "FileDescription",  "ClipBridge Setup & Installer"
-            VALUE "FileVersion",      "1.4.1.0"
+            VALUE "FileVersion",      "1.5.0.0"
             VALUE "InternalName",     "clipbridge-setup"
             VALUE "LegalCopyright",   "Copyright (C) 2026 Ricardo Veronese Ricci. MIT License."
             VALUE "OriginalFilename", "clipbridge-setup.exe"
             VALUE "ProductName",      "ClipBridge Setup"
-            VALUE "ProductVersion",   "1.4.1.0"
+            VALUE "ProductVersion",   "1.5.0.0"
         END
     END
     BLOCK "VarFileInfo"
